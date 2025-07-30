@@ -2,6 +2,7 @@ package controller
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"one-api/common"
 	"one-api/model"
@@ -163,6 +164,10 @@ func UpdateOption(c *gin.Context) {
 		common.ApiError(c, err)
 		return
 	}
+	
+	adminId := c.GetInt("id")
+	model.RecordLog(adminId, model.LogTypeManage, fmt.Sprintf("管理员更新系统设置：%s = %s", option.Key, option.Value))
+	
 	c.JSON(http.StatusOK, gin.H{
 		"success": true,
 		"message": "",

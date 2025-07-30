@@ -513,6 +513,10 @@ func AddChannel(c *gin.Context) {
 		common.ApiError(c, err)
 		return
 	}
+	
+	adminId := c.GetInt("id")
+	model.RecordLog(adminId, model.LogTypeManage, fmt.Sprintf("管理员创建渠道：%s，数量：%d", addChannelRequest.Channel.Name, len(channels)))
+	
 	c.JSON(http.StatusOK, gin.H{
 		"success": true,
 		"message": "",
@@ -522,12 +526,23 @@ func AddChannel(c *gin.Context) {
 
 func DeleteChannel(c *gin.Context) {
 	id, _ := strconv.Atoi(c.Param("id"))
-	channel := model.Channel{Id: id}
-	err := channel.Delete()
+	
+	// 先获取渠道信息用于日志记录
+	channel, err := model.GetChannelById(id, false)
 	if err != nil {
 		common.ApiError(c, err)
 		return
 	}
+	
+	err = channel.Delete()
+	if err != nil {
+		common.ApiError(c, err)
+		return
+	}
+	
+	adminId := c.GetInt("id")
+	model.RecordLog(adminId, model.LogTypeManage, fmt.Sprintf("管理员删除渠道：%s (ID: %d)", channel.Name, channel.Id))
+	
 	model.InitChannelCache()
 	c.JSON(http.StatusOK, gin.H{
 		"success": true,
@@ -709,6 +724,10 @@ func UpdateChannel(c *gin.Context) {
 		common.ApiError(c, err)
 		return
 	}
+	
+	adminId := c.GetInt("id")
+	model.RecordLog(adminId, model.LogTypeManage, fmt.Sprintf("管理员更新渠道：%s (ID: %d)", channel.Name, channel.Id))
+	
 	model.InitChannelCache()
 	channel.Key = ""
 	c.JSON(http.StatusOK, gin.H{

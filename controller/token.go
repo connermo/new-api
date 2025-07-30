@@ -1,6 +1,7 @@
 package controller
 
 import (
+	"fmt"
 	"net/http"
 	"one-api/common"
 	"one-api/model"
@@ -124,6 +125,10 @@ func AddToken(c *gin.Context) {
 		common.ApiError(c, err)
 		return
 	}
+
+	userId := c.GetInt("id")
+	model.RecordLog(userId, model.LogTypeManage, fmt.Sprintf("用户创建令牌：%s", cleanToken.Name))
+
 	c.JSON(http.StatusOK, gin.H{
 		"success": true,
 		"message": "",
@@ -134,11 +139,22 @@ func AddToken(c *gin.Context) {
 func DeleteToken(c *gin.Context) {
 	id, _ := strconv.Atoi(c.Param("id"))
 	userId := c.GetInt("id")
-	err := model.DeleteTokenById(id, userId)
+
+	// 先获取令牌信息用于日志记录
+	token, err := model.GetTokenByIds(id, userId)
 	if err != nil {
 		common.ApiError(c, err)
 		return
 	}
+
+	err = model.DeleteTokenById(id, userId)
+	if err != nil {
+		common.ApiError(c, err)
+		return
+	}
+
+	model.RecordLog(userId, model.LogTypeManage, fmt.Sprintf("用户删除令牌：%s (ID: %d)", token.Name, token.Id))
+
 	c.JSON(http.StatusOK, gin.H{
 		"success": true,
 		"message": "",
@@ -201,6 +217,19 @@ func UpdateToken(c *gin.Context) {
 		common.ApiError(c, err)
 		return
 	}
+
+	if statusOnly == "true" {
+		var statusText string
+		if cleanToken.Status == common.TokenStatusEnabled {
+			statusText = "启用"
+		} else {
+			statusText = "禁用"
+		}
+		model.RecordLog(userId, model.LogTypeManage, fmt.Sprintf("用户%s令牌：%s (ID: %d)", statusText, cleanToken.Name, cleanToken.Id))
+	} else {
+		model.RecordLog(userId, model.LogTypeManage, fmt.Sprintf("用户更新令牌：%s (ID: %d)", cleanToken.Name, cleanToken.Id))
+	}
+
 	c.JSON(http.StatusOK, gin.H{
 		"success": true,
 		"message": "",
