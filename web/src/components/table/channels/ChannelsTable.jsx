@@ -19,12 +19,12 @@ For commercial licensing, please contact support@quantumnous.com
 
 import React, { useMemo } from 'react';
 import { Empty } from '@douyinfe/semi-ui';
-import CardTable from '../../common/ui/CardTable.js';
+import CardTable from '../../common/ui/CardTable';
 import {
   IllustrationNoResult,
-  IllustrationNoResultDark
+  IllustrationNoResultDark,
 } from '@douyinfe/semi-illustrations';
-import { getChannelsColumns } from './ChannelsColumnDefs.js';
+import { getChannelsColumns } from './ChannelsColumnDefs';
 
 const ChannelsTable = (channelsData) => {
   const {
@@ -142,25 +142,27 @@ const ChannelsTable = (channelsData) => {
       rowSelection={
         enableBatchDelete
           ? {
-            onChange: (selectedRowKeys, selectedRows) => {
-              setSelectedChannels(selectedRows);
-            },
-          }
+              onChange: (selectedRowKeys, selectedRows) => {
+                setSelectedChannels(selectedRows);
+              },
+            }
           : null
       }
       empty={
         <Empty
           image={<IllustrationNoResult style={{ width: 150, height: 150 }} />}
-          darkModeImage={<IllustrationNoResultDark style={{ width: 150, height: 150 }} />}
+          darkModeImage={
+            <IllustrationNoResultDark style={{ width: 150, height: 150 }} />
+          }
           description={t('搜索无结果')}
           style={{ padding: 30 }}
         />
       }
-      className="rounded-xl overflow-hidden"
-      size="middle"
+      className='rounded-xl overflow-hidden'
+      size='middle'
       loading={loading || searching}
     />
   );
 };
 
-export default ChannelsTable; 
+export default ChannelsTable;

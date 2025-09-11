@@ -20,6 +20,7 @@ import (
 	relayconstant "one-api/relay/constant"
 	"one-api/relay/helper"
 	"one-api/service"
+	"one-api/setting/operation_setting"
 	"one-api/types"
 	"strconv"
 	"strings"
@@ -132,10 +133,27 @@ func testChannel(channel *model.Channel, testModel string) testResult {
 			newAPIError: newAPIError,
 		}
 	}
+	request := buildTestRequest(testModel)
 
-	info := relaycommon.GenRelayInfo(c)
+	// Determine relay format based on request path
+	relayFormat := types.RelayFormatOpenAI
+	if c.Request.URL.Path == "/v1/embeddings" {
+		relayFormat = types.RelayFormatEmbedding
+	}
 
-	err = helper.ModelMappedHelper(c, info, nil)
+	info, err := relaycommon.GenRelayInfo(c, relayFormat, request, nil)
+
+	if err != nil {
+		return testResult{
+			context:     c,
+			localErr:    err,
+			newAPIError: types.NewError(err, types.ErrorCodeGenRelayInfoFailed),
+		}
+	}
+
+	info.InitChannelMeta(c)
+
+	err = helper.ModelMappedHelper(c, info, request)
 	if err != nil {
 		return testResult{
 			context:     c,
@@ -143,7 +161,9 @@ func testChannel(channel *model.Channel, testModel string) testResult {
 			newAPIError: types.NewError(err, types.ErrorCodeChannelModelMappedError),
 		}
 	}
+
 	testModel = info.UpstreamModelName
+	request.Model = testModel
 
 	apiType, _ := common.ChannelType2APIType(channel.Type)
 	adaptor := relay.GetAdaptor(apiType)
@@ -155,13 +175,12 @@ func testChannel(channel *model.Channel, testModel string) testResult {
 		}
 	}
 
-	request := buildTestRequest(testModel)
-	// 创建一个用于日志的 info 副本，移除 ApiKey
-	logInfo := *info
-	logInfo.ApiKey = ""
-	common.SysLog(fmt.Sprintf("testing channel %d with model %s , info %+v ", channel.Id, testModel, logInfo))
+	//// 创建一个用于日志的 info 副本，移除 ApiKey
+	//logInfo := info
+	//logInfo.ApiKey = ""
+	common.SysLog(fmt.Sprintf("testing channel %d with model %s , info %+v ", channel.Id, testModel, info.ToString()))
 
-	priceData, err := helper.ModelPriceHelper(c, info, 0, int(request.GetMaxTokens()))
+	priceData, err := helper.ModelPriceHelper(c, info, 0, request.GetTokenCountMeta())
 	if err != nil {
 		return testResult{
 			context:     c,
@@ -427,7 +446,7 @@ func testAllChannels(notify bool) error {
 
 			// disable channel
 			if isChannelEnabled && shouldBanChannel && channel.GetAutoBan() {
-				go processChannelError(result.context, *types.NewChannelError(channel.Id, channel.Type, channel.Name, channel.ChannelInfo.IsMultiKey, common.GetContextKeyString(result.context, constant.ContextKeyChannelKey), channel.GetAutoBan()), newAPIError)
+				processChannelError(result.context, *types.NewChannelError(channel.Id, channel.Type, channel.Name, channel.ChannelInfo.IsMultiKey, common.GetContextKeyString(result.context, constant.ContextKeyChannelKey), channel.GetAutoBan()), newAPIError)
 			}
 
 			// enable channel
@@ -459,15 +478,26 @@ func TestAllChannels(c *gin.Context) {
 	return
 }
 
-func AutomaticallyTestChannels(frequency int) {
-	if frequency <= 0 {
-		common.SysLog("CHANNEL_TEST_FREQUENCY is not set or invalid, skipping automatic channel test")
-		return
-	}
-	for {
-		time.Sleep(time.Duration(frequency) * time.Minute)
-		common.SysLog("testing all channels")
-		_ = testAllChannels(false)
-		common.SysLog("channel test finished")
-	}
+var autoTestChannelsOnce sync.Once
+
+func AutomaticallyTestChannels() {
+	autoTestChannelsOnce.Do(func() {
+		for {
+			if !operation_setting.GetMonitorSetting().AutoTestChannelEnabled {
+				time.Sleep(10 * time.Minute)
+				continue
+			}
+			frequency := operation_setting.GetMonitorSetting().AutoTestChannelMinutes
+			common.SysLog(fmt.Sprintf("automatically test channels with interval %d minutes", frequency))
+			for {
+				time.Sleep(time.Duration(frequency) * time.Minute)
+				common.SysLog("automatically testing all channels")
+				_ = testAllChannels(false)
+				common.SysLog("automatically channel test finished")
+				if !operation_setting.GetMonitorSetting().AutoTestChannelEnabled {
+					break
+				}
+			}
+		}
+	})
 }

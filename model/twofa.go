@@ -16,7 +16,7 @@ type TwoFA struct {
 	Id             int            `json:"id" gorm:"primaryKey"`
 	UserId         int            `json:"user_id" gorm:"unique;not null;index"`
 	Secret         string         `json:"-" gorm:"type:varchar(255);not null"` // TOTP密钥，不返回给前端
-	IsEnabled      bool           `json:"is_enabled" gorm:"default:false"`
+	IsEnabled      bool           `json:"is_enabled"`
 	FailedAttempts int            `json:"failed_attempts" gorm:"default:0"`
 	LockedUntil    *time.Time     `json:"locked_until,omitempty"`
 	LastUsedAt     *time.Time     `json:"last_used_at,omitempty"`
@@ -30,7 +30,7 @@ type TwoFABackupCode struct {
 	Id        int            `json:"id" gorm:"primaryKey"`
 	UserId    int            `json:"user_id" gorm:"not null;index"`
 	CodeHash  string         `json:"-" gorm:"type:varchar(255);not null"` // 备用码哈希
-	IsUsed    bool           `json:"is_used" gorm:"default:false"`
+	IsUsed    bool           `json:"is_used"`
 	UsedAt    *time.Time     `json:"used_at,omitempty"`
 	CreatedAt time.Time      `json:"created_at"`
 	DeletedAt gorm.DeletedAt `json:"-" gorm:"index"`
@@ -243,7 +243,7 @@ func (t *TwoFA) ValidateTOTPAndUpdateUsage(code string) (bool, error) {
 	if !common.ValidateTOTPCode(t.Secret, code) {
 		// 增加失败次数
 		if err := t.IncrementFailedAttempts(); err != nil {
-			common.SysError("更新2FA失败次数失败: " + err.Error())
+			common.SysLog("更新2FA失败次数失败: " + err.Error())
 		}
 		return false, nil
 	}
@@ -255,7 +255,7 @@ func (t *TwoFA) ValidateTOTPAndUpdateUsage(code string) (bool, error) {
 	t.LastUsedAt = &now
 
 	if err := t.Update(); err != nil {
-		common.SysError("更新2FA使用记录失败: " + err.Error())
+		common.SysLog("更新2FA使用记录失败: " + err.Error())
 	}
 
 	return true, nil
@@ -277,7 +277,7 @@ func (t *TwoFA) ValidateBackupCodeAndUpdateUsage(code string) (bool, error) {
 	if !valid {
 		// 增加失败次数
 		if err := t.IncrementFailedAttempts(); err != nil {
-			common.SysError("更新2FA失败次数失败: " + err.Error())
+			common.SysLog("更新2FA失败次数失败: " + err.Error())
 		}
 		return false, nil
 	}
@@ -289,7 +289,7 @@ func (t *TwoFA) ValidateBackupCodeAndUpdateUsage(code string) (bool, error) {
 	t.LastUsedAt = &now
 
 	if err := t.Update(); err != nil {
-		common.SysError("更新2FA使用记录失败: " + err.Error())
+		common.SysLog("更新2FA使用记录失败: " + err.Error())
 	}
 
 	return true, nil

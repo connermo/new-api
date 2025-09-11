@@ -1,7 +1,6 @@
 package aws
 
 import (
-	"encoding/json"
 	"fmt"
 	"net/http"
 	"one-api/common"
@@ -113,14 +112,14 @@ func awsHandler(c *gin.Context, info *relaycommon.RelayInfo, requestMode int) (*
 	}
 	claudeReq := claudeReq_.(*dto.ClaudeRequest)
 	awsClaudeReq := copyRequest(claudeReq)
-	awsReq.Body, err = json.Marshal(awsClaudeReq)
+	awsReq.Body, err = common.Marshal(awsClaudeReq)
 	if err != nil {
 		return types.NewError(errors.Wrap(err, "marshal request"), types.ErrorCodeBadResponseBody), nil
 	}
 
 	awsResp, err := awsCli.InvokeModel(c.Request.Context(), awsReq)
 	if err != nil {
-		return types.NewError(errors.Wrap(err, "InvokeModel"), types.ErrorCodeChannelAwsClientError), nil
+		return types.NewOpenAIError(errors.Wrap(err, "InvokeModel"), types.ErrorCodeAwsInvokeError, http.StatusInternalServerError), nil
 	}
 
 	claudeInfo := &claude.ClaudeResponseInfo{
@@ -131,7 +130,12 @@ func awsHandler(c *gin.Context, info *relaycommon.RelayInfo, requestMode int) (*
 		Usage:        &dto.Usage{},
 	}
 
-	handlerErr := claude.HandleClaudeResponseData(c, info, claudeInfo, awsResp.Body, RequestModeMessage)
+	// 复制上游 Content-Type 到客户端响应头
+	if awsResp.ContentType != nil && *awsResp.ContentType != "" {
+		c.Writer.Header().Set("Content-Type", *awsResp.ContentType)
+	}
+
+	handlerErr := claude.HandleClaudeResponseData(c, info, claudeInfo, nil, awsResp.Body, RequestModeMessage)
 	if handlerErr != nil {
 		return handlerErr, nil
 	}
@@ -165,14 +169,14 @@ func awsStreamHandler(c *gin.Context, resp *http.Response, info *relaycommon.Rel
 	claudeReq := claudeReq_.(*dto.ClaudeRequest)
 
 	awsClaudeReq := copyRequest(claudeReq)
-	awsReq.Body, err = json.Marshal(awsClaudeReq)
+	awsReq.Body, err = common.Marshal(awsClaudeReq)
 	if err != nil {
 		return types.NewError(errors.Wrap(err, "marshal request"), types.ErrorCodeBadResponseBody), nil
 	}
 
 	awsResp, err := awsCli.InvokeModelWithResponseStream(c.Request.Context(), awsReq)
 	if err != nil {
-		return types.NewError(errors.Wrap(err, "InvokeModelWithResponseStream"), types.ErrorCodeChannelAwsClientError), nil
+		return types.NewOpenAIError(errors.Wrap(err, "InvokeModelWithResponseStream"), types.ErrorCodeAwsInvokeError, http.StatusInternalServerError), nil
 	}
 	stream := awsResp.GetStream()
 	defer stream.Close()

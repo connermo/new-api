@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"one-api/common"
 	"one-api/dto"
+	"one-api/logger"
 	relaycommon "one-api/relay/common"
 	"one-api/relay/helper"
 	"one-api/service"
@@ -16,7 +17,7 @@ import (
 )
 
 func OaiResponsesHandler(c *gin.Context, info *relaycommon.RelayInfo, resp *http.Response) (*dto.Usage, *types.NewAPIError) {
-	defer common.CloseResponseBodyGracefully(resp)
+	defer service.CloseResponseBodyGracefully(resp)
 
 	// read response body
 	var responsesResponse dto.OpenAIResponsesResponse
@@ -33,7 +34,7 @@ func OaiResponsesHandler(c *gin.Context, info *relaycommon.RelayInfo, resp *http
 	}
 
 	// 写入新的 response body
-	common.IOCopyBytesGracefully(c, resp, responseBody)
+	service.IOCopyBytesGracefully(c, resp, responseBody)
 
 	// compute usage
 	usage := dto.Usage{}
@@ -45,18 +46,28 @@ func OaiResponsesHandler(c *gin.Context, info *relaycommon.RelayInfo, resp *http
 			usage.PromptTokensDetails.CachedTokens = responsesResponse.Usage.InputTokensDetails.CachedTokens
 		}
 	}
+	if info == nil || info.ResponsesUsageInfo == nil || info.ResponsesUsageInfo.BuiltInTools == nil {
+		return &usage, nil
+	}
 	// 解析 Tools 用量
 	for _, tool := range responsesResponse.Tools {
-		info.ResponsesUsageInfo.BuiltInTools[common.Interface2String(tool["type"])].CallCount++
+		buildToolinfo, ok := info.ResponsesUsageInfo.BuiltInTools[common.Interface2String(tool["type"])]
+		if !ok || buildToolinfo == nil {
+			logger.LogError(c, fmt.Sprintf("BuiltInTools not found for tool type: %v", tool["type"]))
+			continue
+		}
+		buildToolinfo.CallCount++
 	}
 	return &usage, nil
 }
 
 func OaiResponsesStreamHandler(c *gin.Context, info *relaycommon.RelayInfo, resp *http.Response) (*dto.Usage, *types.NewAPIError) {
 	if resp == nil || resp.Body == nil {
-		common.LogError(c, "invalid response or response body")
+		logger.LogError(c, "invalid response or response body")
 		return nil, types.NewError(fmt.Errorf("invalid response"), types.ErrorCodeBadResponse)
 	}
+
+	defer service.CloseResponseBodyGracefully(resp)
 
 	var usage = &dto.Usage{}
 	var responseTextBuilder strings.Builder
@@ -69,10 +80,16 @@ func OaiResponsesStreamHandler(c *gin.Context, info *relaycommon.RelayInfo, resp
 			sendResponsesStreamData(c, streamResponse, data)
 			switch streamResponse.Type {
 			case "response.completed":
-				if streamResponse.Response.Usage != nil {
-					usage.PromptTokens = streamResponse.Response.Usage.InputTokens
-					usage.CompletionTokens = streamResponse.Response.Usage.OutputTokens
-					usage.TotalTokens = streamResponse.Response.Usage.TotalTokens
+				if streamResponse.Response != nil && streamResponse.Response.Usage != nil {
+					if streamResponse.Response.Usage.InputTokens != 0 {
+						usage.PromptTokens = streamResponse.Response.Usage.InputTokens
+					}
+					if streamResponse.Response.Usage.OutputTokens != 0 {
+						usage.CompletionTokens = streamResponse.Response.Usage.OutputTokens
+					}
+					if streamResponse.Response.Usage.TotalTokens != 0 {
+						usage.TotalTokens = streamResponse.Response.Usage.TotalTokens
+					}
 					if streamResponse.Response.Usage.InputTokensDetails != nil {
 						usage.PromptTokensDetails.CachedTokens = streamResponse.Response.Usage.InputTokensDetails.CachedTokens
 					}
@@ -89,6 +106,8 @@ func OaiResponsesStreamHandler(c *gin.Context, info *relaycommon.RelayInfo, resp
 					}
 				}
 			}
+		} else {
+			logger.LogError(c, "failed to unmarshal stream response: "+err.Error())
 		}
 		return true
 	})
@@ -102,6 +121,12 @@ func OaiResponsesStreamHandler(c *gin.Context, info *relaycommon.RelayInfo, resp
 			usage.CompletionTokens = completionTokens
 		}
 	}
+
+	if usage.PromptTokens == 0 && usage.CompletionTokens != 0 {
+		usage.PromptTokens = info.PromptTokens
+	}
+
+	usage.TotalTokens = usage.PromptTokens + usage.CompletionTokens
 
 	return usage, nil
 }

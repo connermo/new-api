@@ -1,22 +1,24 @@
 package gemini
 
 import (
-	"github.com/pkg/errors"
 	"io"
 	"net/http"
 	"one-api/common"
 	"one-api/dto"
+	"one-api/logger"
 	relaycommon "one-api/relay/common"
 	"one-api/relay/helper"
 	"one-api/service"
 	"one-api/types"
 	"strings"
 
+	"github.com/pkg/errors"
+
 	"github.com/gin-gonic/gin"
 )
 
 func GeminiTextGenerationHandler(c *gin.Context, info *relaycommon.RelayInfo, resp *http.Response) (*dto.Usage, *types.NewAPIError) {
-	defer common.CloseResponseBodyGracefully(resp)
+	defer service.CloseResponseBodyGracefully(resp)
 
 	// 读取响应体
 	responseBody, err := io.ReadAll(resp.Body)
@@ -44,6 +46,32 @@ func GeminiTextGenerationHandler(c *gin.Context, info *relaycommon.RelayInfo, re
 
 	usage.CompletionTokenDetails.ReasoningTokens = geminiResponse.UsageMetadata.ThoughtsTokenCount
 
+	if strings.HasPrefix(info.UpstreamModelName, "gemini-2.5-flash-image-preview") {
+		imageOutputCounts := 0
+		for _, candidate := range geminiResponse.Candidates {
+			for _, part := range candidate.Content.Parts {
+				if part.InlineData != nil && strings.HasPrefix(part.InlineData.MimeType, "image/") {
+					imageOutputCounts++
+				}
+			}
+		}
+		if imageOutputCounts != 0 {
+			usage.CompletionTokens = usage.CompletionTokens - imageOutputCounts*1290
+			usage.TotalTokens = usage.TotalTokens - imageOutputCounts*1290
+			c.Set("gemini_image_tokens", imageOutputCounts*1290)
+		}
+	}
+
+	// if strings.HasPrefix(info.UpstreamModelName, "gemini-2.5-flash-image-preview") {
+	// 	for _, detail := range geminiResponse.UsageMetadata.CandidatesTokensDetails {
+	// 		if detail.Modality == "IMAGE" {
+	// 			usage.CompletionTokens = usage.CompletionTokens - detail.TokenCount
+	// 			usage.TotalTokens = usage.TotalTokens - detail.TokenCount
+	// 			c.Set("gemini_image_tokens", detail.TokenCount)
+	// 		}
+	// 	}
+	// }
+
 	for _, detail := range geminiResponse.UsageMetadata.PromptTokensDetails {
 		if detail.Modality == "AUDIO" {
 			usage.PromptTokensDetails.AudioTokens = detail.TokenCount
@@ -52,15 +80,45 @@ func GeminiTextGenerationHandler(c *gin.Context, info *relaycommon.RelayInfo, re
 		}
 	}
 
-	// 直接返回 Gemini 原生格式的 JSON 响应
-	jsonResponse, err := common.Marshal(geminiResponse)
+	service.IOCopyBytesGracefully(c, resp, responseBody)
+
+	return &usage, nil
+}
+
+func NativeGeminiEmbeddingHandler(c *gin.Context, resp *http.Response, info *relaycommon.RelayInfo) (*dto.Usage, *types.NewAPIError) {
+	defer service.CloseResponseBodyGracefully(resp)
+
+	responseBody, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, types.NewOpenAIError(err, types.ErrorCodeBadResponseBody, http.StatusInternalServerError)
 	}
 
-	common.IOCopyBytesGracefully(c, resp, jsonResponse)
+	if common.DebugEnabled {
+		println(string(responseBody))
+	}
 
-	return &usage, nil
+	usage := &dto.Usage{
+		PromptTokens: info.PromptTokens,
+		TotalTokens:  info.PromptTokens,
+	}
+
+	if info.IsGeminiBatchEmbedding {
+		var geminiResponse dto.GeminiBatchEmbeddingResponse
+		err = common.Unmarshal(responseBody, &geminiResponse)
+		if err != nil {
+			return nil, types.NewOpenAIError(err, types.ErrorCodeBadResponseBody, http.StatusInternalServerError)
+		}
+	} else {
+		var geminiResponse dto.GeminiEmbeddingResponse
+		err = common.Unmarshal(responseBody, &geminiResponse)
+		if err != nil {
+			return nil, types.NewOpenAIError(err, types.ErrorCodeBadResponseBody, http.StatusInternalServerError)
+		}
+	}
+
+	service.IOCopyBytesGracefully(c, resp, responseBody)
+
+	return usage, nil
 }
 
 func GeminiTextGenerationStreamHandler(c *gin.Context, info *relaycommon.RelayInfo, resp *http.Response) (*dto.Usage, *types.NewAPIError) {
@@ -75,7 +133,7 @@ func GeminiTextGenerationStreamHandler(c *gin.Context, info *relaycommon.RelayIn
 		var geminiResponse dto.GeminiChatResponse
 		err := common.UnmarshalJsonStr(data, &geminiResponse)
 		if err != nil {
-			common.LogError(c, "error unmarshalling stream response: "+err.Error())
+			logger.LogError(c, "error unmarshalling stream response: "+err.Error())
 			return false
 		}
 
@@ -104,12 +162,22 @@ func GeminiTextGenerationStreamHandler(c *gin.Context, info *relaycommon.RelayIn
 					usage.PromptTokensDetails.TextTokens = detail.TokenCount
 				}
 			}
+
+			if strings.HasPrefix(info.UpstreamModelName, "gemini-2.5-flash-image-preview") {
+				for _, detail := range geminiResponse.UsageMetadata.CandidatesTokensDetails {
+					if detail.Modality == "IMAGE" {
+						usage.CompletionTokens = usage.CompletionTokens - detail.TokenCount
+						usage.TotalTokens = usage.TotalTokens - detail.TokenCount
+						c.Set("gemini_image_tokens", detail.TokenCount)
+					}
+				}
+			}
 		}
 
 		// 直接发送 GeminiChatResponse 响应
 		err = helper.StringData(c, data)
 		if err != nil {
-			common.LogError(c, err.Error())
+			logger.LogError(c, err.Error())
 		}
 		info.SendResponseCount++
 		return true
