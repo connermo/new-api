@@ -149,6 +149,30 @@ func AddToken(c *gin.Context) {
 		})
 		return
 	}
+
+	// 验证时段限制配置
+	if token.TimeLimitEnabled && token.TimeLimitConfig != "" {
+		config, parseErr := token.GetTimeLimitConfig()
+		if parseErr != nil {
+			c.JSON(http.StatusOK, gin.H{
+				"success": false,
+				"message": "时段限制配置格式错误: " + parseErr.Error(),
+			})
+			return
+		}
+
+		// 验证每个规则
+		for _, rule := range config.Rules {
+			if err := model.ValidateTimeLimitRule(rule); err != nil {
+				c.JSON(http.StatusOK, gin.H{
+					"success": false,
+					"message": "时段限制规则验证失败: " + err.Error(),
+				})
+				return
+			}
+		}
+	}
+
 	key, err := common.GenerateKey()
 	if err != nil {
 		c.JSON(http.StatusOK, gin.H{
@@ -171,6 +195,8 @@ func AddToken(c *gin.Context) {
 		ModelLimits:        token.ModelLimits,
 		AllowIps:           token.AllowIps,
 		Group:              token.Group,
+		TimeLimitEnabled:   token.TimeLimitEnabled,
+		TimeLimitConfig:    token.TimeLimitConfig,
 	}
 	err = cleanToken.Insert()
 	if err != nil {
@@ -230,6 +256,30 @@ func UpdateToken(c *gin.Context) {
 		})
 		return
 	}
+
+	// 验证时段限制配置
+	if token.TimeLimitEnabled && token.TimeLimitConfig != "" {
+		config, parseErr := token.GetTimeLimitConfig()
+		if parseErr != nil {
+			c.JSON(http.StatusOK, gin.H{
+				"success": false,
+				"message": "时段限制配置格式错误: " + parseErr.Error(),
+			})
+			return
+		}
+
+		// 验证每个规则
+		for _, rule := range config.Rules {
+			if err := model.ValidateTimeLimitRule(rule); err != nil {
+				c.JSON(http.StatusOK, gin.H{
+					"success": false,
+					"message": "时段限制规则验证失败: " + err.Error(),
+				})
+				return
+			}
+		}
+	}
+
 	cleanToken, err := model.GetTokenByIds(token.Id, userId)
 	if err != nil {
 		common.ApiError(c, err)
@@ -263,6 +313,8 @@ func UpdateToken(c *gin.Context) {
 		cleanToken.ModelLimits = token.ModelLimits
 		cleanToken.AllowIps = token.AllowIps
 		cleanToken.Group = token.Group
+		cleanToken.TimeLimitEnabled = token.TimeLimitEnabled
+		cleanToken.TimeLimitConfig = token.TimeLimitConfig
 	}
 	err = cleanToken.Update()
 	if err != nil {

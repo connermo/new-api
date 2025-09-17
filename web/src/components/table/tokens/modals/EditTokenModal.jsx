@@ -41,6 +41,7 @@ import {
   Form,
   Col,
   Row,
+  Select,
 } from '@douyinfe/semi-ui';
 import {
   IconCreditCard,
@@ -48,6 +49,10 @@ import {
   IconSave,
   IconClose,
   IconKey,
+  IconClock,
+  IconPlus,
+  IconMinus,
+  IconDelete,
 } from '@douyinfe/semi-icons';
 import { useTranslation } from 'react-i18next';
 import { StatusContext } from '../../../../context/Status';
@@ -62,6 +67,7 @@ const EditTokenModal = (props) => {
   const formApiRef = useRef(null);
   const [models, setModels] = useState([]);
   const [groups, setGroups] = useState([]);
+  const [timeLimitRules, setTimeLimitRules] = useState([]);
   const isEdit = props.editingToken.id !== undefined;
 
   const getInitValues = () => ({
@@ -73,12 +79,48 @@ const EditTokenModal = (props) => {
     model_limits: [],
     allow_ips: '',
     group: '',
+    time_limit_enabled: false,
+    time_limit_config: '',
     tokenCount: 1,
   });
 
   const handleCancel = () => {
     props.handleClose();
   };
+
+  // 时段限制规则管理函数
+  const addTimeLimitRule = () => {
+    const newRule = {
+      day_of_week: -1,
+      start_time: '09:00',
+      end_time: '17:00',
+    };
+    setTimeLimitRules([...timeLimitRules, newRule]);
+  };
+
+  const removeTimeLimitRule = (index) => {
+    const newRules = [...timeLimitRules];
+    newRules.splice(index, 1);
+    setTimeLimitRules(newRules);
+  };
+
+  const updateTimeLimitRule = (index, field, value) => {
+    const newRules = [...timeLimitRules];
+    newRules[index] = { ...newRules[index], [field]: value };
+    setTimeLimitRules(newRules);
+  };
+
+  // 时段限制配置相关的辅助函数
+  const getDayOfWeekOptions = () => [
+    { label: t('每天'), value: -1 },
+    { label: t('周日'), value: 0 },
+    { label: t('周一'), value: 1 },
+    { label: t('周二'), value: 2 },
+    { label: t('周三'), value: 3 },
+    { label: t('周四'), value: 4 },
+    { label: t('周五'), value: 5 },
+    { label: t('周六'), value: 6 },
+  ];
 
   const setExpiredTime = (month, day, hour, minute) => {
     let now = new Date();
@@ -163,6 +205,21 @@ const EditTokenModal = (props) => {
       } else {
         data.model_limits = [];
       }
+      // 处理时段限制配置
+      if (data.time_limit_enabled && data.time_limit_config) {
+        try {
+          const parsedConfig = JSON.parse(data.time_limit_config);
+          data.time_limit_config = parsedConfig;
+          setTimeLimitRules(parsedConfig.rules || []);
+        } catch (e) {
+          console.warn('Failed to parse time limit config:', e);
+          data.time_limit_config = '';
+          setTimeLimitRules([]);
+        }
+      } else {
+        data.time_limit_config = '';
+        setTimeLimitRules([]);
+      }
       if (formApiRef.current) {
         formApiRef.current.setValues({ ...getInitValues(), ...data });
       }
@@ -188,9 +245,11 @@ const EditTokenModal = (props) => {
         loadToken();
       } else {
         formApiRef.current?.setValues(getInitValues());
+        setTimeLimitRules([]);
       }
     } else {
       formApiRef.current?.reset();
+      setTimeLimitRules([]);
     }
   }, [props.visiable, props.editingToken.id]);
 
@@ -222,6 +281,25 @@ const EditTokenModal = (props) => {
       }
       localInputs.model_limits = localInputs.model_limits.join(',');
       localInputs.model_limits_enabled = localInputs.model_limits.length > 0;
+
+      // 处理时段限制配置
+      if (localInputs.time_limit_enabled) {
+        if (timeLimitRules.length > 0) {
+          try {
+            const config = { rules: timeLimitRules };
+            localInputs.time_limit_config = JSON.stringify(config);
+          } catch (e) {
+            showError(t('时段限制配置格式错误！'));
+            setLoading(false);
+            return;
+          }
+        } else {
+          localInputs.time_limit_config = '';
+        }
+      } else {
+        localInputs.time_limit_config = '';
+      }
+
       let res = await API.put(`/api/token/`, {
         ...localInputs,
         id: parseInt(props.editingToken.id),
@@ -259,6 +337,25 @@ const EditTokenModal = (props) => {
         }
         localInputs.model_limits = localInputs.model_limits.join(',');
         localInputs.model_limits_enabled = localInputs.model_limits.length > 0;
+
+        // 处理时段限制配置
+        if (localInputs.time_limit_enabled) {
+          if (timeLimitRules.length > 0) {
+            try {
+              const config = { rules: timeLimitRules };
+              localInputs.time_limit_config = JSON.stringify(config);
+            } catch (e) {
+              showError(t('时段限制配置格式错误！'));
+              setLoading(false);
+              break;
+            }
+          } else {
+            localInputs.time_limit_config = '';
+          }
+        } else {
+          localInputs.time_limit_config = '';
+        }
+
         let res = await API.post(`/api/token/`, localInputs);
         const { success, message } = res.data;
         if (success) {
@@ -557,6 +654,117 @@ const EditTokenModal = (props) => {
                       style={{ width: '100%' }}
                     />
                   </Col>
+                </Row>
+              </Card>
+
+              {/* 时段限制 */}
+              <Card className='!rounded-2xl shadow-sm border-0'>
+                <div className='flex items-center mb-2'>
+                  <Avatar size='small' color='orange' className='mr-2 shadow-md'>
+                    <IconClock size={16} />
+                  </Avatar>
+                  <div>
+                    <Text className='text-lg font-medium'>{t('时段限制')}</Text>
+                    <div className='text-xs text-gray-600'>
+                      {t('设置令牌的使用时间限制')}
+                    </div>
+                  </div>
+                </div>
+                <Row gutter={12}>
+                  <Col span={24}>
+                    <Form.Switch
+                      field='time_limit_enabled'
+                      label={t('启用时段限制')}
+                      size='large'
+                      extraText={t('启用后，令牌只能在指定的时间段内使用')}
+                    />
+                  </Col>
+                  {values.time_limit_enabled && (
+                    <>
+                      <Col span={24}>
+                        <div className='border rounded-lg p-4 bg-gray-50'>
+                          <div className='flex items-center justify-between mb-3'>
+                            <Text className='font-medium'>{t('时间规则')}</Text>
+                            <Button
+                              type='primary'
+                              size='small'
+                              icon={<IconPlus />}
+                              onClick={addTimeLimitRule}
+                            >
+                              {t('添加规则')}
+                            </Button>
+                          </div>
+                          {timeLimitRules.length === 0 ? (
+                            <div className='text-center py-8 text-gray-500'>
+                              <IconClock size={24} className='mb-2' />
+                              <div>{t('暂无时间规则，点击上方按钮添加')}</div>
+                            </div>
+                          ) : (
+                            <div className='space-y-3'>
+                              {timeLimitRules.map((rule, index) => (
+                                <div key={index} className='bg-white p-3 rounded border'>
+                                  <div className='flex items-center justify-between mb-2'>
+                                    <Text className='font-medium'>{t('规则')} {index + 1}</Text>
+                                    <Button
+                                      type='danger'
+                                      size='small'
+                                      icon={<IconDelete />}
+                                      onClick={() => removeTimeLimitRule(index)}
+                                    >
+                                      {t('删除')}
+                                    </Button>
+                                  </div>
+                                  <Row gutter={8}>
+                                    <Col span={8}>
+                                      <div className='mb-2'>
+                                        <Text size='small' className='text-gray-600'>{t('星期')}</Text>
+                                      </div>
+                                      <Select
+                                        value={rule.day_of_week}
+                                        onChange={(value) => updateTimeLimitRule(index, 'day_of_week', value)}
+                                        optionList={getDayOfWeekOptions()}
+                                        style={{ width: '100%' }}
+                                      />
+                                    </Col>
+                                    <Col span={7}>
+                                      <div className='mb-2'>
+                                        <Text size='small' className='text-gray-600'>{t('开始时间')}</Text>
+                                      </div>
+                                      <input
+                                        type='time'
+                                        value={rule.start_time}
+                                        onChange={(e) => updateTimeLimitRule(index, 'start_time', e.target.value)}
+                                        className='w-full px-2 py-1 border rounded text-sm'
+                                      />
+                                    </Col>
+                                    <Col span={7}>
+                                      <div className='mb-2'>
+                                        <Text size='small' className='text-gray-600'>{t('结束时间')}</Text>
+                                      </div>
+                                      <input
+                                        type='time'
+                                        value={rule.end_time}
+                                        onChange={(e) => updateTimeLimitRule(index, 'end_time', e.target.value)}
+                                        className='w-full px-2 py-1 border rounded text-sm'
+                                      />
+                                    </Col>
+                                  </Row>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                          {timeLimitRules.length > 0 && (
+                            <div className='mt-3 p-2 bg-blue-50 rounded text-sm text-blue-700'>
+                              <div className='flex items-center'>
+                                <IconClock size={14} className='mr-1' />
+                                {t('提示：多个规则之间是"或"的关系，满足任一规则即可使用')}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </Col>
+                    </>
+                  )}
                 </Row>
               </Card>
             </div>

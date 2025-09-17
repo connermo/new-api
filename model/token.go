@@ -1,10 +1,12 @@
 package model
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"one-api/common"
 	"strings"
+	"time"
 
 	"github.com/bytedance/gopkg/util/gopool"
 	"gorm.io/gorm"
@@ -26,11 +28,14 @@ type Token struct {
 	AllowIps           *string        `json:"allow_ips" gorm:"default:''"`
 	UsedQuota          int            `json:"used_quota" gorm:"default:0"` // used quota
 	Group              string         `json:"group" gorm:"default:''"`
+	TimeLimitEnabled   bool           `json:"time_limit_enabled" gorm:"default:false"`                // 是否启用时段限制
+	TimeLimitConfig    string         `json:"time_limit_config" gorm:"type:varchar(2048);default:''"` // 时段限制配置，JSON格式
 	DeletedAt          gorm.DeletedAt `gorm:"index"`
 }
 
 func (token *Token) Clean() {
 	token.Key = ""
+	// 注意：不要清除时段限制相关的敏感信息，因为这些是配置信息，不是敏感数据
 }
 
 func (token *Token) GetIpLimitsMap() map[string]any {
@@ -109,6 +114,19 @@ func ValidateUserToken(key string) (token *Token, err error) {
 			keySuffix := key[len(key)-3:]
 			return token, errors.New(fmt.Sprintf("[sk-%s***%s] 该令牌额度已用尽 !token.UnlimitedQuota && token.RemainQuota = %d", keyPrefix, keySuffix, token.RemainQuota))
 		}
+
+		// 检查时段限制
+		if token.TimeLimitEnabled {
+			isAllowed, timeErr := token.CheckTimeLimit()
+			if timeErr != nil {
+				common.SysLog(fmt.Sprintf("令牌时段限制检查失败 token_id=%d, error=%v", token.Id, timeErr))
+				return token, errors.New("令牌时段限制检查失败")
+			}
+			if !isAllowed {
+				return token, errors.New("该令牌当前时段不可用，请检查令牌的使用时间限制")
+			}
+		}
+
 		return token, nil
 	}
 	return nil, errors.New("无效的令牌")
@@ -184,7 +202,7 @@ func (token *Token) Update() (err error) {
 		}
 	}()
 	err = DB.Model(token).Select("name", "status", "expired_time", "remain_quota", "unlimited_quota",
-		"model_limits_enabled", "model_limits", "allow_ips", "group").Updates(token).Error
+		"model_limits_enabled", "model_limits", "allow_ips", "group", "time_limit_enabled", "time_limit_config").Updates(token).Error
 	return err
 }
 
@@ -360,4 +378,132 @@ func BatchDeleteTokens(ids []int, userId int) (int, error) {
 	}
 
 	return len(tokens), nil
+}
+
+// TimeLimitRule 时段限制规则
+type TimeLimitRule struct {
+	DayOfWeek int    `json:"day_of_week"` // 0=周日, 1=周一, ..., 6=周六, -1=每天
+	StartTime string `json:"start_time"`  // HH:MM格式
+	EndTime   string `json:"end_time"`    // HH:MM格式
+}
+
+// TimeLimitConfig 时段限制配置
+type TimeLimitConfig struct {
+	Rules []TimeLimitRule `json:"rules"` // 多个时段规则
+}
+
+// GetTimeLimitConfig 获取时段限制配置
+func (token *Token) GetTimeLimitConfig() (*TimeLimitConfig, error) {
+	if !token.TimeLimitEnabled || token.TimeLimitConfig == "" {
+		return nil, nil
+	}
+
+	config := &TimeLimitConfig{}
+	err := json.Unmarshal([]byte(token.TimeLimitConfig), config)
+	if err != nil {
+		return nil, fmt.Errorf("解析时段限制配置失败: %v", err)
+	}
+
+	return config, nil
+}
+
+// SetTimeLimitConfig 设置时段限制配置
+func (token *Token) SetTimeLimitConfig(config *TimeLimitConfig) error {
+	if config == nil {
+		token.TimeLimitConfig = ""
+		return nil
+	}
+
+	configBytes, err := json.Marshal(config)
+	if err != nil {
+		return fmt.Errorf("序列化时段限制配置失败: %v", err)
+	}
+
+	token.TimeLimitConfig = string(configBytes)
+	return nil
+}
+
+// CheckTimeLimit 检查当前时间是否在允许的时段内
+func (token *Token) CheckTimeLimit() (bool, error) {
+	if !token.TimeLimitEnabled {
+		return true, nil // 未启用时段限制，允许访问
+	}
+
+	config, err := token.GetTimeLimitConfig()
+	if err != nil {
+		return false, err
+	}
+
+	if config == nil || len(config.Rules) == 0 {
+		return true, nil // 没有配置规则，允许访问
+	}
+
+	now := time.Now()
+	currentDay := int(now.Weekday()) // 0=周日, 1=周一, ..., 6=周六
+	currentTime := now.Format("15:04")
+
+	for _, rule := range config.Rules {
+		// 检查是否是指定星期几或每天
+		if rule.DayOfWeek != -1 && rule.DayOfWeek != currentDay {
+			continue
+		}
+
+		// 检查时间范围
+		if currentTime >= rule.StartTime && currentTime <= rule.EndTime {
+			return true, nil // 在允许时段内
+		}
+	}
+
+	return false, nil // 不在任何允许时段内
+}
+
+// ValidateTimeLimitRule 验证时段规则的格式
+func ValidateTimeLimitRule(rule TimeLimitRule) error {
+	// 验证星期几
+	if rule.DayOfWeek < -1 || rule.DayOfWeek > 6 {
+		return errors.New("星期几必须在-1到6之间（-1表示每天）")
+	}
+
+	// 验证时间格式
+	if !isValidTimeFormat(rule.StartTime) {
+		return errors.New("开始时间格式不正确，应为HH:MM格式")
+	}
+	if !isValidTimeFormat(rule.EndTime) {
+		return errors.New("结束时间格式不正确，应为HH:MM格式")
+	}
+
+	// 验证时间逻辑
+	if rule.StartTime >= rule.EndTime {
+		return errors.New("开始时间必须小于结束时间")
+	}
+
+	return nil
+}
+
+// isValidTimeFormat 验证时间格式是否正确（HH:MM）
+func isValidTimeFormat(timeStr string) bool {
+	if len(timeStr) != 5 {
+		return false
+	}
+
+	hour := timeStr[:2]
+	minute := timeStr[3:]
+
+	if timeStr[2] != ':' {
+		return false
+	}
+
+	// 验证小时
+	h, err := time.ParseDuration(hour + "h")
+	if err != nil || h.Hours() < 0 || h.Hours() > 23 {
+		return false
+	}
+
+	// 验证分钟
+	m, err := time.ParseDuration(minute + "m")
+	if err != nil || m.Minutes() < 0 || m.Minutes() > 59 {
+		return false
+	}
+
+	return true
 }

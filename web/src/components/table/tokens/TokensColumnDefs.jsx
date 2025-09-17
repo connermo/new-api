@@ -45,6 +45,7 @@ import {
   IconCopy,
   IconEyeOpened,
   IconEyeClosed,
+  IconClock,
 } from '@douyinfe/semi-icons';
 
 // progress color helper
@@ -250,6 +251,79 @@ const renderAllowIps = (text, t) => {
   }
 
   return <Space wrap>{ipTags}</Space>;
+};
+
+// Render time limit column
+const renderTimeLimit = (text, record, t) => {
+  if (!record.time_limit_enabled) {
+    return (
+      <Tag color='white' shape='circle'>
+        {t('无限制')}
+      </Tag>
+    );
+  }
+
+  try {
+    const config = JSON.parse(record.time_limit_config || '{}');
+    const rules = config.rules || [];
+
+    if (rules.length === 0) {
+      return (
+        <Tag color='orange' shape='circle'>
+          <IconClock size={12} style={{ marginRight: 4 }} />
+          {t('已启用')}
+        </Tag>
+      );
+    }
+
+    // 格式化时间规则显示
+    const formatRule = (rule) => {
+      const dayNames = [
+        t('周日'), t('周一'), t('周二'), t('周三'),
+        t('周四'), t('周五'), t('周六')
+      ];
+
+      const dayText = rule.day_of_week === -1
+        ? t('每天')
+        : dayNames[rule.day_of_week] || t('未知');
+
+      return `${dayText} ${rule.start_time}-${rule.end_time}`;
+    };
+
+    const displayRules = rules.slice(0, 1);
+    const extraCount = rules.length - displayRules.length;
+
+    const ruleTags = displayRules.map((rule, idx) => (
+      <Tag key={idx} color='orange' shape='circle' size='small'>
+        <IconClock size={10} style={{ marginRight: 2 }} />
+        {formatRule(rule)}
+      </Tag>
+    ));
+
+    if (extraCount > 0) {
+      const allRules = rules.map(rule => formatRule(rule)).join('; ');
+      ruleTags.push(
+        <Tooltip
+          key='extra'
+          content={allRules}
+          position='top'
+          showArrow
+        >
+          <Tag color='orange' shape='circle' size='small'>
+            {'+' + extraCount}
+          </Tag>
+        </Tooltip>,
+      );
+    }
+
+    return <Space wrap>{ruleTags}</Space>;
+  } catch (e) {
+    return (
+      <Tag color='red' shape='circle'>
+        {t('配置错误')}
+      </Tag>
+    );
+  }
 };
 
 // Render separate quota usage column
@@ -472,6 +546,11 @@ export const getTokensColumns = ({
       title: t('IP限制'),
       dataIndex: 'allow_ips',
       render: (text) => renderAllowIps(text, t),
+    },
+    {
+      title: t('时段限制'),
+      key: 'time_limit',
+      render: (text, record) => renderTimeLimit(text, record, t),
     },
     {
       title: t('创建时间'),
