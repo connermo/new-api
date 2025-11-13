@@ -1,0 +1,41 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: redis
+  namespace: new-api
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: redis
+  template:
+    metadata:
+      labels:
+        app: redis
+    spec:
+      containers:
+      - name: redis
+        image: redis:latest
+        ports:
+        - containerPort: 6379
+        resources:
+          requests:
+            cpu: 1000m       # 1 核心，支持高并发缓存访问
+            memory: 2Gi      # 2GB
+          limits:
+            cpu: 2000m       # 2 核心
+            memory: 4Gi      # 4GB
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: redis
+  namespace: new-api
+spec:
+  selector:
+    app: redis
+  ports:
+  - port: 6379
+    targetPort: 6379
+  type: ClusterIP
