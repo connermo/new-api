@@ -4,13 +4,14 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"one-api/common"
-	"one-api/model"
-	"one-api/setting"
-	"one-api/setting/console_setting"
-	"one-api/setting/ratio_setting"
-	"one-api/setting/system_setting"
 	"strings"
+
+	"github.com/QuantumNous/new-api/common"
+	"github.com/QuantumNous/new-api/model"
+	"github.com/QuantumNous/new-api/setting"
+	"github.com/QuantumNous/new-api/setting/console_setting"
+	"github.com/QuantumNous/new-api/setting/ratio_setting"
+	"github.com/QuantumNous/new-api/setting/system_setting"
 
 	"github.com/gin-gonic/gin"
 )
@@ -70,6 +71,14 @@ func UpdateOption(c *gin.Context) {
 			})
 			return
 		}
+	case "discord.enabled":
+		if option.Value == "true" && system_setting.GetDiscordSettings().ClientId == "" {
+			c.JSON(http.StatusOK, gin.H{
+				"success": false,
+				"message": "无法启用 Discord OAuth，请先填入 Discord Client Id 以及 Discord Client Secret！",
+			})
+			return
+		}
 	case "oidc.enabled":
 		if option.Value == "true" && system_setting.GetOIDCSettings().ClientId == "" {
 			c.JSON(http.StatusOK, gin.H{
@@ -125,6 +134,33 @@ func UpdateOption(c *gin.Context) {
 			c.JSON(http.StatusOK, gin.H{
 				"success": false,
 				"message": err.Error(),
+			})
+			return
+		}
+	case "ImageRatio":
+		err = ratio_setting.UpdateImageRatioByJSONString(option.Value.(string))
+		if err != nil {
+			c.JSON(http.StatusOK, gin.H{
+				"success": false,
+				"message": "图片倍率设置失败: " + err.Error(),
+			})
+			return
+		}
+	case "AudioRatio":
+		err = ratio_setting.UpdateAudioRatioByJSONString(option.Value.(string))
+		if err != nil {
+			c.JSON(http.StatusOK, gin.H{
+				"success": false,
+				"message": "音频倍率设置失败: " + err.Error(),
+			})
+			return
+		}
+	case "AudioCompletionRatio":
+		err = ratio_setting.UpdateAudioCompletionRatioByJSONString(option.Value.(string))
+		if err != nil {
+			c.JSON(http.StatusOK, gin.H{
+				"success": false,
+				"message": "音频补全倍率设置失败: " + err.Error(),
 			})
 			return
 		}

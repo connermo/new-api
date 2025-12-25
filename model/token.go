@@ -4,10 +4,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"one-api/common"
 	"strings"
 	"time"
 
+	"github.com/QuantumNous/new-api/common"
 	"github.com/bytedance/gopkg/util/gopool"
 	"gorm.io/gorm"
 )
@@ -30,6 +30,7 @@ type Token struct {
 	Group              string         `json:"group" gorm:"default:''"`
 	TimeLimitEnabled   bool           `json:"time_limit_enabled" gorm:"default:false"`                // 是否启用时段限制
 	TimeLimitConfig    string         `json:"time_limit_config" gorm:"type:varchar(2048);default:''"` // 时段限制配置，JSON格式
+	CrossGroupRetry    bool           `json:"cross_group_retry" gorm:"default:false"`                 // 跨分组重试，仅auto分组有效
 	DeletedAt          gorm.DeletedAt `gorm:"index"`
 }
 
@@ -38,26 +39,26 @@ func (token *Token) Clean() {
 	// 注意：不要清除时段限制相关的敏感信息，因为这些是配置信息，不是敏感数据
 }
 
-func (token *Token) GetIpLimitsMap() map[string]any {
+func (token *Token) GetIpLimits() []string {
 	// delete empty spaces
 	//split with \n
-	ipLimitsMap := make(map[string]any)
+	ipLimits := make([]string, 0)
 	if token.AllowIps == nil {
-		return ipLimitsMap
+		return ipLimits
 	}
 	cleanIps := strings.ReplaceAll(*token.AllowIps, " ", "")
 	if cleanIps == "" {
-		return ipLimitsMap
+		return ipLimits
 	}
 	ips := strings.Split(cleanIps, "\n")
 	for _, ip := range ips {
 		ip = strings.TrimSpace(ip)
 		ip = strings.ReplaceAll(ip, ",", "")
-		if common.IsIP(ip) {
-			ipLimitsMap[ip] = true
+		if ip != "" {
+			ipLimits = append(ipLimits, ip)
 		}
 	}
-	return ipLimitsMap
+	return ipLimits
 }
 
 func GetAllUserTokens(userId int, startIdx int, num int) ([]*Token, error) {
@@ -129,7 +130,12 @@ func ValidateUserToken(key string) (token *Token, err error) {
 
 		return token, nil
 	}
-	return nil, errors.New("无效的令牌")
+	common.SysLog("ValidateUserToken: failed to get token: " + err.Error())
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, errors.New("无效的令牌")
+	} else {
+		return nil, errors.New("无效的令牌，数据库查询出错，请联系管理员")
+	}
 }
 
 func GetTokenByIds(id int, userId int) (*Token, error) {
@@ -202,7 +208,7 @@ func (token *Token) Update() (err error) {
 		}
 	}()
 	err = DB.Model(token).Select("name", "status", "expired_time", "remain_quota", "unlimited_quota",
-		"model_limits_enabled", "model_limits", "allow_ips", "group", "time_limit_enabled", "time_limit_config").Updates(token).Error
+		"model_limits_enabled", "model_limits", "allow_ips", "group", "time_limit_enabled", "time_limit_config", "cross_group_retry").Updates(token).Error
 	return err
 }
 

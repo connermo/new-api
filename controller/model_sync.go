@@ -13,8 +13,8 @@ import (
 	"sync"
 	"time"
 
-	"one-api/common"
-	"one-api/model"
+	"github.com/QuantumNous/new-api/common"
+	"github.com/QuantumNous/new-api/model"
 
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
@@ -258,14 +258,6 @@ func SyncUpstreamModels(c *gin.Context) {
 	missing, err := model.GetMissingModels()
 	if err != nil {
 		c.JSON(http.StatusOK, gin.H{"success": false, "message": err.Error()})
-		return
-	}
-	if len(missing) == 0 {
-		c.JSON(http.StatusOK, gin.H{"success": true, "data": gin.H{
-			"created_models":  0,
-			"created_vendors": 0,
-			"skipped_models":  []string{},
-		}})
 		return
 	}
 

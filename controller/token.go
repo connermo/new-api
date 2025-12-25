@@ -3,10 +3,11 @@ package controller
 import (
 	"fmt"
 	"net/http"
-	"one-api/common"
-	"one-api/model"
 	"strconv"
 	"strings"
+
+	"github.com/QuantumNous/new-api/common"
+	"github.com/QuantumNous/new-api/model"
 
 	"github.com/gin-gonic/gin"
 )
@@ -142,7 +143,7 @@ func AddToken(c *gin.Context) {
 		common.ApiError(c, err)
 		return
 	}
-	if len(token.Name) > 30 {
+	if len(token.Name) > 50 {
 		c.JSON(http.StatusOK, gin.H{
 			"success": false,
 			"message": "令牌名称过长",
@@ -197,6 +198,7 @@ func AddToken(c *gin.Context) {
 		Group:              token.Group,
 		TimeLimitEnabled:   token.TimeLimitEnabled,
 		TimeLimitConfig:    token.TimeLimitConfig,
+		CrossGroupRetry:    token.CrossGroupRetry,
 	}
 	err = cleanToken.Insert()
 	if err != nil {
@@ -249,7 +251,7 @@ func UpdateToken(c *gin.Context) {
 		common.ApiError(c, err)
 		return
 	}
-	if len(token.Name) > 30 {
+	if len(token.Name) > 50 {
 		c.JSON(http.StatusOK, gin.H{
 			"success": false,
 			"message": "令牌名称过长",
@@ -315,6 +317,7 @@ func UpdateToken(c *gin.Context) {
 		cleanToken.Group = token.Group
 		cleanToken.TimeLimitEnabled = token.TimeLimitEnabled
 		cleanToken.TimeLimitConfig = token.TimeLimitConfig
+		cleanToken.CrossGroupRetry = token.CrossGroupRetry
 	}
 	err = cleanToken.Update()
 	if err != nil {

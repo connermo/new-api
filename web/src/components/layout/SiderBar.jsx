@@ -58,7 +58,7 @@ const SiderBar = ({ onNavigate = () => {} }) => {
     loading: sidebarLoading,
   } = useSidebar();
 
-  const showSkeleton = useMinimumLoadingTime(sidebarLoading);
+  const showSkeleton = useMinimumLoadingTime(sidebarLoading, 200);
 
   const [selectedKeys, setSelectedKeys] = useState(['home']);
   const [chatItems, setChatItems] = useState([]);
@@ -377,7 +377,6 @@ const SiderBar = ({ onNavigate = () => {} }) => {
       className='sidebar-container'
       style={{
         width: 'var(--sidebar-current-width)',
-        background: 'var(--semi-color-bg-0)',
       }}
     >
       <SkeletonWrapper
