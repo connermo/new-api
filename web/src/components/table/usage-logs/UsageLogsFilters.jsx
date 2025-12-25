@@ -117,8 +117,8 @@ const LogsFilters = ({
 
         {/* 操作按钮区域 */}
         <div className='flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3'>
-          {/* 日志类型选择器 */}
-          <div className='w-full sm:w-auto'>
+          <div className='flex flex-col sm:flex-row gap-3 w-full sm:w-auto items-start sm:items-center'>
+            {/* 日志类型选择器 */}
             <Form.Select
               field='logType'
               placeholder={t('日志类型')}
@@ -140,6 +140,11 @@ const LogsFilters = ({
               <Form.Select.Option value='4'>{t('系统')}</Form.Select.Option>
               <Form.Select.Option value='5'>{t('错误')}</Form.Select.Option>
             </Form.Select>
+
+            {/* 模糊搜索复选框 */}
+            <Form.Checkbox field='fuzzy_search' noLabel>
+              {t('模糊搜索')}
+            </Form.Checkbox>
           </div>
 
           <div className='flex gap-2 w-full sm:w-auto justify-end'>

@@ -99,6 +99,7 @@ export const useLogsData = () => {
       timestamp2string(now.getTime() / 1000 + 3600),
     ],
     logType: '0',
+    fuzzy_search: true, // 默认启用模糊搜索
   };
 
   // Column visibility state
@@ -223,6 +224,7 @@ export const useLogsData = () => {
       channel: formValues.channel || '',
       group: formValues.group || '',
       logType: formValues.logType ? parseInt(formValues.logType) : 0,
+      fuzzy_search: formValues.fuzzy_search !== undefined ? formValues.fuzzy_search : true,
     };
   };
 
@@ -235,11 +237,13 @@ export const useLogsData = () => {
       end_timestamp,
       group,
       logType: formLogType,
+      fuzzy_search,
     } = getFormValues();
     const currentLogType = formLogType !== undefined ? formLogType : logType;
     let localStartTimestamp = Date.parse(start_timestamp) / 1000;
     let localEndTimestamp = Date.parse(end_timestamp) / 1000;
-    let url = `/api/log/self/stat?type=${currentLogType}&token_name=${token_name}&model_name=${model_name}&start_timestamp=${localStartTimestamp}&end_timestamp=${localEndTimestamp}&group=${group}`;
+    const fuzzyParam = fuzzy_search ? '1' : '0';
+    let url = `/api/log/self/stat?type=${currentLogType}&token_name=${token_name}&model_name=${model_name}&start_timestamp=${localStartTimestamp}&end_timestamp=${localEndTimestamp}&group=${group}&fuzzy_search=${fuzzyParam}`;
     url = encodeURI(url);
     let res = await API.get(url);
     const { success, message, data } = res.data;
@@ -260,11 +264,13 @@ export const useLogsData = () => {
       channel,
       group,
       logType: formLogType,
+      fuzzy_search,
     } = getFormValues();
     const currentLogType = formLogType !== undefined ? formLogType : logType;
     let localStartTimestamp = Date.parse(start_timestamp) / 1000;
     let localEndTimestamp = Date.parse(end_timestamp) / 1000;
-    let url = `/api/log/stat?type=${currentLogType}&username=${username}&token_name=${token_name}&model_name=${model_name}&start_timestamp=${localStartTimestamp}&end_timestamp=${localEndTimestamp}&channel=${channel}&group=${group}`;
+    const fuzzyParam = fuzzy_search ? '1' : '0';
+    let url = `/api/log/stat?type=${currentLogType}&username=${username}&token_name=${token_name}&model_name=${model_name}&start_timestamp=${localStartTimestamp}&end_timestamp=${localEndTimestamp}&channel=${channel}&group=${group}&fuzzy_search=${fuzzyParam}`;
     url = encodeURI(url);
     let res = await API.get(url);
     const { success, message, data } = res.data;
@@ -515,6 +521,7 @@ export const useLogsData = () => {
       channel,
       group,
       logType: formLogType,
+      fuzzy_search,
     } = getFormValues();
 
     const currentLogType =
@@ -526,10 +533,11 @@ export const useLogsData = () => {
 
     let localStartTimestamp = Date.parse(start_timestamp) / 1000;
     let localEndTimestamp = Date.parse(end_timestamp) / 1000;
+    const fuzzyParam = fuzzy_search ? '1' : '0';
     if (isAdminUser) {
-      url = `/api/log/?p=${startIdx}&page_size=${pageSize}&type=${currentLogType}&username=${username}&token_name=${token_name}&model_name=${model_name}&start_timestamp=${localStartTimestamp}&end_timestamp=${localEndTimestamp}&channel=${channel}&group=${group}`;
+      url = `/api/log/?p=${startIdx}&page_size=${pageSize}&type=${currentLogType}&username=${username}&token_name=${token_name}&model_name=${model_name}&start_timestamp=${localStartTimestamp}&end_timestamp=${localEndTimestamp}&channel=${channel}&group=${group}&fuzzy_search=${fuzzyParam}`;
     } else {
-      url = `/api/log/self/?p=${startIdx}&page_size=${pageSize}&type=${currentLogType}&token_name=${token_name}&model_name=${model_name}&start_timestamp=${localStartTimestamp}&end_timestamp=${localEndTimestamp}&group=${group}`;
+      url = `/api/log/self/?p=${startIdx}&page_size=${pageSize}&type=${currentLogType}&token_name=${token_name}&model_name=${model_name}&start_timestamp=${localStartTimestamp}&end_timestamp=${localEndTimestamp}&group=${group}&fuzzy_search=${fuzzyParam}`;
     }
     url = encodeURI(url);
     const res = await API.get(url);
