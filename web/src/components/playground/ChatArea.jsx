@@ -22,6 +22,7 @@ import { Card, Chat, Typography, Button } from '@douyinfe/semi-ui';
 import { MessageSquare, Eye, EyeOff } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import CustomInputRender from './CustomInputRender';
+import TokenUsageDisplay from './TokenUsageDisplay';
 
 const ChatArea = ({
   chatRef,
@@ -30,6 +31,7 @@ const ChatArea = ({
   styleState,
   showDebugPanel,
   roleInfo,
+  debugData,
   onMessageSend,
   onMessageCopy,
   onMessageReset,
@@ -94,7 +96,7 @@ const ChatArea = ({
       )}
 
       {/* 聊天内容区域 */}
-      <div className='flex-1 overflow-hidden'>
+      <div className='flex-1 overflow-hidden flex flex-col'>
         <Chat
           ref={chatRef}
           chatBoxRenderConfig={{
@@ -118,9 +120,19 @@ const ChatArea = ({
           showStopGenerate
           onStopGenerator={onStopGenerator}
           onClear={onClearMessages}
-          className='h-full'
+          className='flex-1'
           placeholder={t('请输入您的问题...')}
         />
+
+        {/* Token使用统计 - 显示在输入框上方 */}
+        {debugData?.usage && (
+          <div className='px-4 pb-4'>
+            <TokenUsageDisplay
+              usage={debugData.usage}
+              tokensPerSecond={debugData.tokensPerSecond}
+            />
+          </div>
+        )}
       </div>
     </Card>
   );

@@ -503,6 +503,7 @@ const Playground = () => {
                 styleState={styleState}
                 showDebugPanel={showDebugPanel}
                 roleInfo={roleInfo}
+                debugData={debugData}
                 onMessageSend={onMessageSend}
                 onMessageCopy={messageActions.handleMessageCopy}
                 onMessageReset={messageActions.handleMessageReset}

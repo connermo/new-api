@@ -174,6 +174,7 @@ export const useApiRequest = (
   // 非流式请求
   const handleNonStreamRequest = useCallback(
     async (payload) => {
+      const startTime = Date.now();
       setDebugData((prev) => ({
         ...prev,
         request: payload,
@@ -181,6 +182,10 @@ export const useApiRequest = (
         response: null,
         sseMessages: null, // 非流式请求清除 SSE 消息
         isStreaming: false,
+        usage: null,
+        requestStartTime: startTime,
+        requestEndTime: null,
+        tokensPerSecond: null,
       }));
       setActiveDebugTab(DEBUG_TABS.REQUEST);
 
@@ -220,11 +225,22 @@ export const useApiRequest = (
           );
         }
 
+        const endTime = Date.now();
         const data = await response.json();
+
+        // 提取usage信息并计算吞吐速率
+        const usage = data.usage || null;
+        const elapsedSeconds = (endTime - startTime) / 1000;
+        const tokensPerSecond = usage?.total_tokens
+          ? (usage.total_tokens / elapsedSeconds).toFixed(2)
+          : null;
 
         setDebugData((prev) => ({
           ...prev,
           response: JSON.stringify(data, null, 2),
+          usage,
+          requestEndTime: endTime,
+          tokensPerSecond,
         }));
         setActiveDebugTab(DEBUG_TABS.RESPONSE);
 
@@ -288,6 +304,7 @@ export const useApiRequest = (
   // SSE请求
   const handleSSE = useCallback(
     (payload) => {
+      const startTime = Date.now();
       setDebugData((prev) => ({
         ...prev,
         request: payload,
@@ -295,6 +312,10 @@ export const useApiRequest = (
         response: null,
         sseMessages: [], // 新增：存储 SSE 消息数组
         isStreaming: true, // 新增：标记流式状态
+        usage: null,
+        requestStartTime: startTime,
+        requestEndTime: null,
+        tokensPerSecond: null,
       }));
       setActiveDebugTab(DEBUG_TABS.REQUEST);
 
@@ -312,17 +333,29 @@ export const useApiRequest = (
       let responseData = '';
       let hasReceivedFirstResponse = false;
       let isStreamComplete = false; // 添加标志位跟踪流是否正常完成
+      let lastUsage = null; // 保存最后接收到的usage信息
 
       source.addEventListener('message', (e) => {
         if (e.data === '[DONE]') {
           isStreamComplete = true; // 标记流正常完成
+          const endTime = Date.now();
           source.close();
           sseSourceRef.current = null;
-          setDebugData((prev) => ({ 
-            ...prev, 
+
+          // 计算吞吐速率
+          const elapsedSeconds = (endTime - startTime) / 1000;
+          const tokensPerSecond = lastUsage?.total_tokens
+            ? (lastUsage.total_tokens / elapsedSeconds).toFixed(2)
+            : null;
+
+          setDebugData((prev) => ({
+            ...prev,
             response: responseData,
             sseMessages: [...(prev.sseMessages || []), '[DONE]'], // 添加 DONE 标记
             isStreaming: false,
+            usage: lastUsage,
+            requestEndTime: endTime,
+            tokensPerSecond,
           }));
           completeMessage();
           return;
@@ -335,6 +368,11 @@ export const useApiRequest = (
           if (!hasReceivedFirstResponse) {
             setActiveDebugTab(DEBUG_TABS.RESPONSE);
             hasReceivedFirstResponse = true;
+          }
+
+          // 保存usage信息（通常在最后一条消息中）
+          if (payload.usage) {
+            lastUsage = payload.usage;
           }
 
           // 新增：将 SSE 消息添加到数组
