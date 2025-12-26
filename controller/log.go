@@ -18,7 +18,7 @@ func GetAllLogs(c *gin.Context) {
 	username := c.Query("username")
 	tokenName := c.Query("token_name")
 	modelName := c.Query("model_name")
-	channel, _ := strconv.Atoi(c.Query("channel"))
+	channel := c.Query("channel")
 	group := c.Query("group")
 	fuzzySearch := c.Query("fuzzy_search") == "1"
 	logs, total, err := model.GetAllLogs(logType, startTimestamp, endTimestamp, modelName, username, tokenName, pageInfo.GetStartIdx(), pageInfo.GetPageSize(), channel, group, fuzzySearch)
@@ -108,7 +108,7 @@ func GetLogsStat(c *gin.Context) {
 	tokenName := c.Query("token_name")
 	username := c.Query("username")
 	modelName := c.Query("model_name")
-	channel, _ := strconv.Atoi(c.Query("channel"))
+	channel := c.Query("channel")
 	group := c.Query("group")
 	fuzzySearch := c.Query("fuzzy_search") == "1"
 	stat := model.SumUsedQuota(logType, startTimestamp, endTimestamp, modelName, username, tokenName, channel, group, fuzzySearch)
@@ -132,7 +132,7 @@ func GetLogsSelfStat(c *gin.Context) {
 	endTimestamp, _ := strconv.ParseInt(c.Query("end_timestamp"), 10, 64)
 	tokenName := c.Query("token_name")
 	modelName := c.Query("model_name")
-	channel, _ := strconv.Atoi(c.Query("channel"))
+	channel := c.Query("channel")
 	group := c.Query("group")
 	fuzzySearch := c.Query("fuzzy_search") == "1"
 	quotaNum := model.SumUsedQuota(logType, startTimestamp, endTimestamp, modelName, username, tokenName, channel, group, fuzzySearch)

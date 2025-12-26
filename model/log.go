@@ -202,7 +202,7 @@ func RecordConsumeLog(c *gin.Context, userId int, params RecordConsumeLogParams)
 	}
 }
 
-func GetAllLogs(logType int, startTimestamp int64, endTimestamp int64, modelName string, username string, tokenName string, startIdx int, num int, channel int, group string, fuzzySearch bool) (logs []*Log, total int64, err error) {
+func GetAllLogs(logType int, startTimestamp int64, endTimestamp int64, modelName string, username string, tokenName string, startIdx int, num int, channel string, group string, fuzzySearch bool) (logs []*Log, total int64, err error) {
 	var tx *gorm.DB
 	if logType == LogTypeUnknown {
 		tx = LOG_DB
@@ -237,8 +237,12 @@ func GetAllLogs(logType int, startTimestamp int64, endTimestamp int64, modelName
 	if endTimestamp != 0 {
 		tx = tx.Where("logs.created_at <= ?", endTimestamp)
 	}
-	if channel != 0 {
-		tx = tx.Where("logs.channel_id = ?", channel)
+	if channel != "" {
+		if fuzzySearch {
+			tx = tx.Joins("LEFT JOIN channels ON logs.channel_id = channels.id").Where("channels.name like ?", "%"+channel+"%")
+		} else {
+			tx = tx.Joins("LEFT JOIN channels ON logs.channel_id = channels.id").Where("channels.name = ?", channel)
+		}
 	}
 	if group != "" {
 		if fuzzySearch {
@@ -348,7 +352,7 @@ type Stat struct {
 	Tpm   int `json:"tpm"`
 }
 
-func SumUsedQuota(logType int, startTimestamp int64, endTimestamp int64, modelName string, username string, tokenName string, channel int, group string, fuzzySearch bool) (stat Stat) {
+func SumUsedQuota(logType int, startTimestamp int64, endTimestamp int64, modelName string, username string, tokenName string, channel string, group string, fuzzySearch bool) (stat Stat) {
 	tx := LOG_DB.Table("logs").Select("sum(quota) quota")
 
 	// 为rpm和tpm创建单独的查询
@@ -387,9 +391,14 @@ func SumUsedQuota(logType int, startTimestamp int64, endTimestamp int64, modelNa
 			rpmTpmQuery = rpmTpmQuery.Where("model_name = ?", modelName)
 		}
 	}
-	if channel != 0 {
-		tx = tx.Where("channel_id = ?", channel)
-		rpmTpmQuery = rpmTpmQuery.Where("channel_id = ?", channel)
+	if channel != "" {
+		if fuzzySearch {
+			tx = tx.Joins("LEFT JOIN channels ON logs.channel_id = channels.id").Where("channels.name like ?", "%"+channel+"%")
+			rpmTpmQuery = rpmTpmQuery.Joins("LEFT JOIN channels ON logs.channel_id = channels.id").Where("channels.name like ?", "%"+channel+"%")
+		} else {
+			tx = tx.Joins("LEFT JOIN channels ON logs.channel_id = channels.id").Where("channels.name = ?", channel)
+			rpmTpmQuery = rpmTpmQuery.Joins("LEFT JOIN channels ON logs.channel_id = channels.id").Where("channels.name = ?", channel)
+		}
 	}
 	if group != "" {
 		if fuzzySearch {
