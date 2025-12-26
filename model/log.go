@@ -202,7 +202,7 @@ func RecordConsumeLog(c *gin.Context, userId int, params RecordConsumeLogParams)
 	}
 }
 
-func GetAllLogs(logType int, startTimestamp int64, endTimestamp int64, modelName string, username string, tokenName string, startIdx int, num int, channel int, group string) (logs []*Log, total int64, err error) {
+func GetAllLogs(logType int, startTimestamp int64, endTimestamp int64, modelName string, username string, tokenName string, startIdx int, num int, channel int, group string, fuzzySearch bool) (logs []*Log, total int64, err error) {
 	var tx *gorm.DB
 	if logType == LogTypeUnknown {
 		tx = LOG_DB
@@ -211,7 +211,11 @@ func GetAllLogs(logType int, startTimestamp int64, endTimestamp int64, modelName
 	}
 
 	if modelName != "" {
-		tx = tx.Where("logs.model_name like ?", modelName)
+		if fuzzySearch {
+			tx = tx.Where("logs.model_name like ?", "%"+modelName+"%")
+		} else {
+			tx = tx.Where("logs.model_name = ?", modelName)
+		}
 	}
 	if username != "" {
 		tx = tx.Where("logs.username = ?", username)
@@ -267,7 +271,7 @@ func GetAllLogs(logType int, startTimestamp int64, endTimestamp int64, modelName
 	return logs, total, err
 }
 
-func GetUserLogs(userId int, logType int, startTimestamp int64, endTimestamp int64, modelName string, tokenName string, startIdx int, num int, group string) (logs []*Log, total int64, err error) {
+func GetUserLogs(userId int, logType int, startTimestamp int64, endTimestamp int64, modelName string, tokenName string, startIdx int, num int, group string, fuzzySearch bool) (logs []*Log, total int64, err error) {
 	var tx *gorm.DB
 	if logType == LogTypeUnknown {
 		tx = LOG_DB.Where("logs.user_id = ?", userId)
@@ -276,7 +280,11 @@ func GetUserLogs(userId int, logType int, startTimestamp int64, endTimestamp int
 	}
 
 	if modelName != "" {
-		tx = tx.Where("logs.model_name like ?", modelName)
+		if fuzzySearch {
+			tx = tx.Where("logs.model_name like ?", "%"+modelName+"%")
+		} else {
+			tx = tx.Where("logs.model_name = ?", modelName)
+		}
 	}
 	if tokenName != "" {
 		tx = tx.Where("logs.token_name = ?", tokenName)
@@ -320,7 +328,7 @@ type Stat struct {
 	Tpm   int `json:"tpm"`
 }
 
-func SumUsedQuota(logType int, startTimestamp int64, endTimestamp int64, modelName string, username string, tokenName string, channel int, group string) (stat Stat) {
+func SumUsedQuota(logType int, startTimestamp int64, endTimestamp int64, modelName string, username string, tokenName string, channel int, group string, fuzzySearch bool) (stat Stat) {
 	tx := LOG_DB.Table("logs").Select("sum(quota) quota")
 
 	// 为rpm和tpm创建单独的查询
@@ -341,8 +349,13 @@ func SumUsedQuota(logType int, startTimestamp int64, endTimestamp int64, modelNa
 		tx = tx.Where("created_at <= ?", endTimestamp)
 	}
 	if modelName != "" {
-		tx = tx.Where("model_name like ?", modelName)
-		rpmTpmQuery = rpmTpmQuery.Where("model_name like ?", modelName)
+		if fuzzySearch {
+			tx = tx.Where("model_name like ?", "%"+modelName+"%")
+			rpmTpmQuery = rpmTpmQuery.Where("model_name like ?", "%"+modelName+"%")
+		} else {
+			tx = tx.Where("model_name = ?", modelName)
+			rpmTpmQuery = rpmTpmQuery.Where("model_name = ?", modelName)
+		}
 	}
 	if channel != 0 {
 		tx = tx.Where("channel_id = ?", channel)

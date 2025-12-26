@@ -16,7 +16,7 @@ version: '3.4' # For compatibility with older Docker versions
 
 services:
   new-api:
-    image: ghcr.io/connermo/new-api:latest
+    image: ghcr.io/connermo/new-api:0.10.3-plus
     container_name: new-api
     restart: always
     command: --log-dir /app/logs
