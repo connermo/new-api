@@ -1,0 +1,57 @@
+name: Tag Latest Docker Image
+
+on:
+  workflow_dispatch:
+    inputs:
+      source_tag:
+        description: 'Source tag to promote to latest (e.g., 0.10.3-plus)'
+        required: true
+        type: string
+  push:
+    branches: [ main ]
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  tag-latest:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+    - name: Log in to Container Registry
+      uses: docker/login-action@v3
+      with:
+        registry: ${{ env.REGISTRY }}
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+        logout: false
+
+    - name: Determine source tag
+      id: source
+      run: |
+        if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+          echo "tag=${{ inputs.source_tag }}" >> $GITHUB_OUTPUT
+        else
+          # Get the latest tag from VERSION file or use a default
+          echo "tag=0.10.3-plus" >> $GITHUB_OUTPUT
+        fi
+
+    - name: Tag and push latest
+      run: |
+        SOURCE_TAG="${{ steps.source.outputs.tag }}"
+        IMAGE="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}"
+
+        echo "Pulling source image: ${IMAGE}:${SOURCE_TAG}"
+        docker pull ${IMAGE}:${SOURCE_TAG}
+
+        echo "Tagging as latest"
+        docker tag ${IMAGE}:${SOURCE_TAG} ${IMAGE}:latest
+
+        echo "Pushing latest tag"
+        docker push ${IMAGE}:latest
+
+        echo "✅ Successfully tagged ${IMAGE}:${SOURCE_TAG} as latest"
