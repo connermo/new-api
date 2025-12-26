@@ -136,7 +136,7 @@ export const useApiRequest = (
 
   // 完成消息
   const completeMessage = useCallback(
-    (status = MESSAGE_STATUS.COMPLETE) => {
+    (status = MESSAGE_STATUS.COMPLETE, performanceData = {}) => {
       setMessage((prevMessage) => {
         const lastMessage = prevMessage[prevMessage.length - 1];
         if (
@@ -154,6 +154,9 @@ export const useApiRequest = (
             ...lastMessage,
             status: status,
             ...autoCollapseState,
+            usage: performanceData.usage,
+            tokensPerSecond: performanceData.tokensPerSecond,
+            firstTokenTime: performanceData.firstTokenTime,
           },
         ];
 
@@ -266,6 +269,9 @@ export const useApiRequest = (
                 reasoningContent: processed.reasoningContent,
                 status: MESSAGE_STATUS.COMPLETE,
                 ...autoCollapseState,
+                usage,
+                tokensPerSecond,
+                firstTokenTime: null, // 非流式请求没有首字延迟
               };
             }
             return newMessages;
@@ -334,6 +340,7 @@ export const useApiRequest = (
       let hasReceivedFirstResponse = false;
       let isStreamComplete = false; // 添加标志位跟踪流是否正常完成
       let lastUsage = null; // 保存最后接收到的usage信息
+      let firstTokenTime = null; // 保存首字延迟
 
       source.addEventListener('message', (e) => {
         if (e.data === '[DONE]') {
@@ -357,7 +364,11 @@ export const useApiRequest = (
             requestEndTime: endTime,
             tokensPerSecond,
           }));
-          completeMessage();
+          completeMessage(MESSAGE_STATUS.COMPLETE, {
+            usage: lastUsage,
+            tokensPerSecond,
+            firstTokenTime,
+          });
           return;
         }
 
@@ -383,6 +394,11 @@ export const useApiRequest = (
 
           const delta = payload.choices?.[0]?.delta;
           if (delta) {
+            // 记录首字延迟（第一次收到内容时）
+            if (firstTokenTime === null && (delta.reasoning_content || delta.reasoning || delta.content)) {
+              firstTokenTime = ((Date.now() - startTime) / 1000).toFixed(1);
+            }
+
             if (delta.reasoning_content) {
               streamMessageUpdate(delta.reasoning_content, 'reasoning');
             }
