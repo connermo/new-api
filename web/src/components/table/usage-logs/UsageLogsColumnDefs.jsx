@@ -264,16 +264,21 @@ export const getLogsColumns = ({
           }
         }
 
+        const displayText = record.channel_name || `${t('渠道')} ${text}`;
+        const tooltipContent = record.channel_name
+          ? `${record.channel_name} (ID: ${text})`
+          : t('未知渠道');
+
         return isAdminUser &&
           (record.type === 0 || record.type === 2 || record.type === 5) ? (
           <Space>
-            <Tooltip content={record.channel_name || t('未知渠道')}>
+            <Tooltip content={tooltipContent}>
               <span>
                 <Tag
                   color={colors[parseInt(text) % colors.length]}
                   shape='circle'
                 >
-                  {text}
+                  {displayText}
                 </Tag>
               </span>
             </Tooltip>
