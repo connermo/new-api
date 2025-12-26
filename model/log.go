@@ -218,10 +218,18 @@ func GetAllLogs(logType int, startTimestamp int64, endTimestamp int64, modelName
 		}
 	}
 	if username != "" {
-		tx = tx.Where("logs.username = ?", username)
+		if fuzzySearch {
+			tx = tx.Where("logs.username like ?", "%"+username+"%")
+		} else {
+			tx = tx.Where("logs.username = ?", username)
+		}
 	}
 	if tokenName != "" {
-		tx = tx.Where("logs.token_name = ?", tokenName)
+		if fuzzySearch {
+			tx = tx.Where("logs.token_name like ?", "%"+tokenName+"%")
+		} else {
+			tx = tx.Where("logs.token_name = ?", tokenName)
+		}
 	}
 	if startTimestamp != 0 {
 		tx = tx.Where("logs.created_at >= ?", startTimestamp)
@@ -233,7 +241,11 @@ func GetAllLogs(logType int, startTimestamp int64, endTimestamp int64, modelName
 		tx = tx.Where("logs.channel_id = ?", channel)
 	}
 	if group != "" {
-		tx = tx.Where("logs."+logGroupCol+" = ?", group)
+		if fuzzySearch {
+			tx = tx.Where("logs."+logGroupCol+" like ?", "%"+group+"%")
+		} else {
+			tx = tx.Where("logs."+logGroupCol+" = ?", group)
+		}
 	}
 	err = tx.Model(&Log{}).Count(&total).Error
 	if err != nil {
@@ -287,7 +299,11 @@ func GetUserLogs(userId int, logType int, startTimestamp int64, endTimestamp int
 		}
 	}
 	if tokenName != "" {
-		tx = tx.Where("logs.token_name = ?", tokenName)
+		if fuzzySearch {
+			tx = tx.Where("logs.token_name like ?", "%"+tokenName+"%")
+		} else {
+			tx = tx.Where("logs.token_name = ?", tokenName)
+		}
 	}
 	if startTimestamp != 0 {
 		tx = tx.Where("logs.created_at >= ?", startTimestamp)
@@ -296,7 +312,11 @@ func GetUserLogs(userId int, logType int, startTimestamp int64, endTimestamp int
 		tx = tx.Where("logs.created_at <= ?", endTimestamp)
 	}
 	if group != "" {
-		tx = tx.Where("logs."+logGroupCol+" = ?", group)
+		if fuzzySearch {
+			tx = tx.Where("logs."+logGroupCol+" like ?", "%"+group+"%")
+		} else {
+			tx = tx.Where("logs."+logGroupCol+" = ?", group)
+		}
 	}
 	err = tx.Model(&Log{}).Count(&total).Error
 	if err != nil {
@@ -335,12 +355,22 @@ func SumUsedQuota(logType int, startTimestamp int64, endTimestamp int64, modelNa
 	rpmTpmQuery := LOG_DB.Table("logs").Select("count(*) rpm, sum(prompt_tokens) + sum(completion_tokens) tpm")
 
 	if username != "" {
-		tx = tx.Where("username = ?", username)
-		rpmTpmQuery = rpmTpmQuery.Where("username = ?", username)
+		if fuzzySearch {
+			tx = tx.Where("username like ?", "%"+username+"%")
+			rpmTpmQuery = rpmTpmQuery.Where("username like ?", "%"+username+"%")
+		} else {
+			tx = tx.Where("username = ?", username)
+			rpmTpmQuery = rpmTpmQuery.Where("username = ?", username)
+		}
 	}
 	if tokenName != "" {
-		tx = tx.Where("token_name = ?", tokenName)
-		rpmTpmQuery = rpmTpmQuery.Where("token_name = ?", tokenName)
+		if fuzzySearch {
+			tx = tx.Where("token_name like ?", "%"+tokenName+"%")
+			rpmTpmQuery = rpmTpmQuery.Where("token_name like ?", "%"+tokenName+"%")
+		} else {
+			tx = tx.Where("token_name = ?", tokenName)
+			rpmTpmQuery = rpmTpmQuery.Where("token_name = ?", tokenName)
+		}
 	}
 	if startTimestamp != 0 {
 		tx = tx.Where("created_at >= ?", startTimestamp)
@@ -362,8 +392,13 @@ func SumUsedQuota(logType int, startTimestamp int64, endTimestamp int64, modelNa
 		rpmTpmQuery = rpmTpmQuery.Where("channel_id = ?", channel)
 	}
 	if group != "" {
-		tx = tx.Where(logGroupCol+" = ?", group)
-		rpmTpmQuery = rpmTpmQuery.Where(logGroupCol+" = ?", group)
+		if fuzzySearch {
+			tx = tx.Where(logGroupCol+" like ?", "%"+group+"%")
+			rpmTpmQuery = rpmTpmQuery.Where(logGroupCol+" like ?", "%"+group+"%")
+		} else {
+			tx = tx.Where(logGroupCol+" = ?", group)
+			rpmTpmQuery = rpmTpmQuery.Where(logGroupCol+" = ?", group)
+		}
 	}
 
 	tx = tx.Where("type = ?", LogTypeConsume)
