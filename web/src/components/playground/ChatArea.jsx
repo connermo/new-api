@@ -22,7 +22,6 @@ import { Card, Chat, Typography, Button } from '@douyinfe/semi-ui';
 import { MessageSquare, Eye, EyeOff } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import CustomInputRender from './CustomInputRender';
-import TokenUsageDisplay from './TokenUsageDisplay';
 
 const ChatArea = ({
   chatRef,
@@ -123,16 +122,6 @@ const ChatArea = ({
           className='flex-1'
           placeholder={t('请输入您的问题...')}
         />
-
-        {/* Token使用统计 - 显示在输入框上方 */}
-        {debugData?.usage && (
-          <div className='px-4 pb-4'>
-            <TokenUsageDisplay
-              usage={debugData.usage}
-              tokensPerSecond={debugData.tokensPerSecond}
-            />
-          </div>
-        )}
       </div>
     </Card>
   );
