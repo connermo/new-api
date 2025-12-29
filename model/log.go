@@ -50,6 +50,15 @@ const (
 	LogTypeRefund  = 6
 )
 
+// getCaseInsensitiveLikeOperator returns the appropriate LIKE operator for case-insensitive search
+// PostgreSQL requires ILIKE, while MySQL and SQLite use LIKE (which is case-insensitive by default)
+func getCaseInsensitiveLikeOperator() string {
+	if common.UsingPostgreSQL || common.LogSqlType == common.DatabaseTypePostgreSQL {
+		return "ILIKE"
+	}
+	return "LIKE"
+}
+
 func formatUserLogs(logs []*Log) {
 	for i := range logs {
 		logs[i].ChannelName = ""
@@ -212,21 +221,21 @@ func GetAllLogs(logType int, startTimestamp int64, endTimestamp int64, modelName
 
 	if modelName != "" {
 		if fuzzySearch {
-			tx = tx.Where("logs.model_name like ?", "%"+modelName+"%")
+			tx = tx.Where("logs.model_name "+getCaseInsensitiveLikeOperator()+" ?", "%"+modelName+"%")
 		} else {
 			tx = tx.Where("logs.model_name = ?", modelName)
 		}
 	}
 	if username != "" {
 		if fuzzySearch {
-			tx = tx.Where("logs.username like ?", "%"+username+"%")
+			tx = tx.Where("logs.username "+getCaseInsensitiveLikeOperator()+" ?", "%"+username+"%")
 		} else {
 			tx = tx.Where("logs.username = ?", username)
 		}
 	}
 	if tokenName != "" {
 		if fuzzySearch {
-			tx = tx.Where("logs.token_name like ?", "%"+tokenName+"%")
+			tx = tx.Where("logs.token_name "+getCaseInsensitiveLikeOperator()+" ?", "%"+tokenName+"%")
 		} else {
 			tx = tx.Where("logs.token_name = ?", tokenName)
 		}
@@ -239,14 +248,14 @@ func GetAllLogs(logType int, startTimestamp int64, endTimestamp int64, modelName
 	}
 	if channel != "" {
 		if fuzzySearch {
-			tx = tx.Joins("LEFT JOIN channels ON logs.channel_id = channels.id").Where("channels.name like ?", "%"+channel+"%")
+			tx = tx.Joins("LEFT JOIN channels ON logs.channel_id = channels.id").Where("channels.name "+getCaseInsensitiveLikeOperator()+" ?", "%"+channel+"%")
 		} else {
 			tx = tx.Joins("LEFT JOIN channels ON logs.channel_id = channels.id").Where("channels.name = ?", channel)
 		}
 	}
 	if group != "" {
 		if fuzzySearch {
-			tx = tx.Where("logs."+logGroupCol+" like ?", "%"+group+"%")
+			tx = tx.Where("logs."+logGroupCol+" "+getCaseInsensitiveLikeOperator()+" ?", "%"+group+"%")
 		} else {
 			tx = tx.Where("logs."+logGroupCol+" = ?", group)
 		}
@@ -297,14 +306,14 @@ func GetUserLogs(userId int, logType int, startTimestamp int64, endTimestamp int
 
 	if modelName != "" {
 		if fuzzySearch {
-			tx = tx.Where("logs.model_name like ?", "%"+modelName+"%")
+			tx = tx.Where("logs.model_name "+getCaseInsensitiveLikeOperator()+" ?", "%"+modelName+"%")
 		} else {
 			tx = tx.Where("logs.model_name = ?", modelName)
 		}
 	}
 	if tokenName != "" {
 		if fuzzySearch {
-			tx = tx.Where("logs.token_name like ?", "%"+tokenName+"%")
+			tx = tx.Where("logs.token_name "+getCaseInsensitiveLikeOperator()+" ?", "%"+tokenName+"%")
 		} else {
 			tx = tx.Where("logs.token_name = ?", tokenName)
 		}
@@ -317,7 +326,7 @@ func GetUserLogs(userId int, logType int, startTimestamp int64, endTimestamp int
 	}
 	if group != "" {
 		if fuzzySearch {
-			tx = tx.Where("logs."+logGroupCol+" like ?", "%"+group+"%")
+			tx = tx.Where("logs."+logGroupCol+" "+getCaseInsensitiveLikeOperator()+" ?", "%"+group+"%")
 		} else {
 			tx = tx.Where("logs."+logGroupCol+" = ?", group)
 		}
@@ -360,8 +369,9 @@ func SumUsedQuota(logType int, startTimestamp int64, endTimestamp int64, modelNa
 
 	if username != "" {
 		if fuzzySearch {
-			tx = tx.Where("username like ?", "%"+username+"%")
-			rpmTpmQuery = rpmTpmQuery.Where("username like ?", "%"+username+"%")
+			operator := getCaseInsensitiveLikeOperator()
+			tx = tx.Where("username "+operator+" ?", "%"+username+"%")
+			rpmTpmQuery = rpmTpmQuery.Where("username "+operator+" ?", "%"+username+"%")
 		} else {
 			tx = tx.Where("username = ?", username)
 			rpmTpmQuery = rpmTpmQuery.Where("username = ?", username)
@@ -369,8 +379,9 @@ func SumUsedQuota(logType int, startTimestamp int64, endTimestamp int64, modelNa
 	}
 	if tokenName != "" {
 		if fuzzySearch {
-			tx = tx.Where("token_name like ?", "%"+tokenName+"%")
-			rpmTpmQuery = rpmTpmQuery.Where("token_name like ?", "%"+tokenName+"%")
+			operator := getCaseInsensitiveLikeOperator()
+			tx = tx.Where("token_name "+operator+" ?", "%"+tokenName+"%")
+			rpmTpmQuery = rpmTpmQuery.Where("token_name "+operator+" ?", "%"+tokenName+"%")
 		} else {
 			tx = tx.Where("token_name = ?", tokenName)
 			rpmTpmQuery = rpmTpmQuery.Where("token_name = ?", tokenName)
@@ -384,8 +395,9 @@ func SumUsedQuota(logType int, startTimestamp int64, endTimestamp int64, modelNa
 	}
 	if modelName != "" {
 		if fuzzySearch {
-			tx = tx.Where("model_name like ?", "%"+modelName+"%")
-			rpmTpmQuery = rpmTpmQuery.Where("model_name like ?", "%"+modelName+"%")
+			operator := getCaseInsensitiveLikeOperator()
+			tx = tx.Where("model_name "+operator+" ?", "%"+modelName+"%")
+			rpmTpmQuery = rpmTpmQuery.Where("model_name "+operator+" ?", "%"+modelName+"%")
 		} else {
 			tx = tx.Where("model_name = ?", modelName)
 			rpmTpmQuery = rpmTpmQuery.Where("model_name = ?", modelName)
@@ -393,8 +405,9 @@ func SumUsedQuota(logType int, startTimestamp int64, endTimestamp int64, modelNa
 	}
 	if channel != "" {
 		if fuzzySearch {
-			tx = tx.Joins("LEFT JOIN channels ON logs.channel_id = channels.id").Where("channels.name like ?", "%"+channel+"%")
-			rpmTpmQuery = rpmTpmQuery.Joins("LEFT JOIN channels ON logs.channel_id = channels.id").Where("channels.name like ?", "%"+channel+"%")
+			operator := getCaseInsensitiveLikeOperator()
+			tx = tx.Joins("LEFT JOIN channels ON logs.channel_id = channels.id").Where("channels.name "+operator+" ?", "%"+channel+"%")
+			rpmTpmQuery = rpmTpmQuery.Joins("LEFT JOIN channels ON logs.channel_id = channels.id").Where("channels.name "+operator+" ?", "%"+channel+"%")
 		} else {
 			tx = tx.Joins("LEFT JOIN channels ON logs.channel_id = channels.id").Where("channels.name = ?", channel)
 			rpmTpmQuery = rpmTpmQuery.Joins("LEFT JOIN channels ON logs.channel_id = channels.id").Where("channels.name = ?", channel)
@@ -402,8 +415,9 @@ func SumUsedQuota(logType int, startTimestamp int64, endTimestamp int64, modelNa
 	}
 	if group != "" {
 		if fuzzySearch {
-			tx = tx.Where(logGroupCol+" like ?", "%"+group+"%")
-			rpmTpmQuery = rpmTpmQuery.Where(logGroupCol+" like ?", "%"+group+"%")
+			operator := getCaseInsensitiveLikeOperator()
+			tx = tx.Where(logGroupCol+" "+operator+" ?", "%"+group+"%")
+			rpmTpmQuery = rpmTpmQuery.Where(logGroupCol+" "+operator+" ?", "%"+group+"%")
 		} else {
 			tx = tx.Where(logGroupCol+" = ?", group)
 			rpmTpmQuery = rpmTpmQuery.Where(logGroupCol+" = ?", group)
