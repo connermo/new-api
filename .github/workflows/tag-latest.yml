@@ -7,8 +7,12 @@ on:
         description: 'Source tag to promote to latest (e.g., 0.10.3-plus)'
         required: true
         type: string
-  push:
-    branches: [ main ]
+  workflow_run:
+    workflows: ["Build and Push Docker Image"]
+    types:
+      - completed
+    branches:
+      - main
 
 env:
   REGISTRY: ghcr.io
@@ -17,11 +21,17 @@ env:
 jobs:
   tag-latest:
     runs-on: ubuntu-latest
+    # Only run if the build workflow completed successfully
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
     permissions:
       contents: read
       packages: write
 
     steps:
+    - name: Checkout repository
+      if: github.event_name != 'workflow_dispatch'
+      uses: actions/checkout@v4
+
     - name: Log in to Container Registry
       uses: docker/login-action@v3
       with:
@@ -36,8 +46,9 @@ jobs:
         if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
           echo "tag=${{ inputs.source_tag }}" >> $GITHUB_OUTPUT
         else
-          # Get the latest tag from VERSION file or use a default
-          echo "tag=0.10.3-plus" >> $GITHUB_OUTPUT
+          # Get the version from VERSION file
+          VERSION=$(cat VERSION 2>/dev/null || echo "0.10.3-plus")
+          echo "tag=${VERSION}" >> $GITHUB_OUTPUT
         fi
 
     - name: Tag and push latest
