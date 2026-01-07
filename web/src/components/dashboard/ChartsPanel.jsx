@@ -59,7 +59,7 @@ const ChartsPanel = ({
       render: (text) => renderNumber(text),
     },
     {
-      title: t('备注'),
+      title: t('模型描述'),
       dataIndex: 'total_quota',
       key: 'total_quota',
       sorter: (a, b) => a.total_quota - b.total_quota,
