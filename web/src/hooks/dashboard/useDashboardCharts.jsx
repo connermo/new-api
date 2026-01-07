@@ -45,6 +45,7 @@ export const useDashboardCharts = (
   setPieData,
   setLineData,
   setModelColors,
+  setModelTableData,
   t,
 ) => {
   // ========== 图表规格状态 ==========
@@ -406,6 +407,30 @@ export const useDashboardCharts = (
         'rankData',
       );
 
+      // ===== 模型统计表格数据 =====
+      const modelStats = new Map();
+      data.forEach((item) => {
+        const model = item.model_name;
+        if (!modelStats.has(model)) {
+          modelStats.set(model, {
+            model_name: model,
+            call_count: 0,
+            total_tokens: 0,
+            total_quota: 0,
+          });
+        }
+        const stats = modelStats.get(model);
+        stats.call_count += item.count;
+        stats.total_tokens += item.token_used;
+        stats.total_quota += item.quota;
+      });
+
+      const tableData = Array.from(modelStats.values()).map((item, index) => ({
+        key: index,
+        ...item,
+      }));
+
+      setModelTableData(tableData);
       setPieData(newPieData);
       setLineData(newLineData);
       setConsumeQuota(totalQuota);
@@ -422,6 +447,7 @@ export const useDashboardCharts = (
       setConsumeQuota,
       setTimes,
       setConsumeTokens,
+      setModelTableData,
       t,
     ],
   );
