@@ -11,6 +11,7 @@ import (
 func SetApiRouter(router *gin.Engine) {
 	apiRouter := router.Group("/api")
 	apiRouter.Use(gzip.Gzip(gzip.DefaultCompression))
+	apiRouter.Use(middleware.BodyStorageCleanup()) // 清理请求体存储
 	apiRouter.Use(middleware.GlobalAPIRateLimit())
 	{
 		apiRouter.GET("/setup", controller.GetSetup)
@@ -93,6 +94,10 @@ func SetApiRouter(router *gin.Engine) {
 				selfRoute.POST("/2fa/enable", controller.Enable2FA)
 				selfRoute.POST("/2fa/disable", controller.Disable2FA)
 				selfRoute.POST("/2fa/backup_codes", controller.RegenerateBackupCodes)
+
+				// Check-in routes
+				selfRoute.GET("/checkin", controller.GetCheckinStatus)
+				selfRoute.POST("/checkin", middleware.TurnstileCheck(), controller.DoCheckin)
 			}
 
 			adminRoute := userRoute.Group("/")
@@ -119,8 +124,18 @@ func SetApiRouter(router *gin.Engine) {
 		{
 			optionRoute.GET("/", controller.GetOptions)
 			optionRoute.PUT("/", controller.UpdateOption)
+			optionRoute.GET("/channel_affinity_cache", controller.GetChannelAffinityCacheStats)
+			optionRoute.DELETE("/channel_affinity_cache", controller.ClearChannelAffinityCache)
 			optionRoute.POST("/rest_model_ratio", controller.ResetModelRatio)
 			optionRoute.POST("/migrate_console_setting", controller.MigrateConsoleSetting) // 用于迁移检测的旧键，下个版本会删除
+		}
+		performanceRoute := apiRouter.Group("/performance")
+		performanceRoute.Use(middleware.RootAuth())
+		{
+			performanceRoute.GET("/stats", controller.GetPerformanceStats)
+			performanceRoute.DELETE("/disk_cache", controller.ClearDiskCache)
+			performanceRoute.POST("/reset_stats", controller.ResetPerformanceStats)
+			performanceRoute.POST("/gc", controller.ForceGC)
 		}
 		ratioSyncRoute := apiRouter.Group("/ratio_sync")
 		ratioSyncRoute.Use(middleware.RootAuth())
@@ -152,6 +167,16 @@ func SetApiRouter(router *gin.Engine) {
 			channelRoute.POST("/fix", controller.FixChannelsAbilities)
 			channelRoute.GET("/fetch_models/:id", controller.FetchUpstreamModels)
 			channelRoute.POST("/fetch_models", controller.FetchModels)
+			channelRoute.POST("/codex/oauth/start", controller.StartCodexOAuth)
+			channelRoute.POST("/codex/oauth/complete", controller.CompleteCodexOAuth)
+			channelRoute.POST("/:id/codex/oauth/start", controller.StartCodexOAuthForChannel)
+			channelRoute.POST("/:id/codex/oauth/complete", controller.CompleteCodexOAuthForChannel)
+			channelRoute.POST("/:id/codex/refresh", controller.RefreshCodexChannelCredential)
+			channelRoute.GET("/:id/codex/usage", controller.GetCodexChannelUsage)
+			channelRoute.POST("/ollama/pull", controller.OllamaPullModel)
+			channelRoute.POST("/ollama/pull/stream", controller.OllamaPullModelStream)
+			channelRoute.DELETE("/ollama/delete", controller.OllamaDeleteModel)
+			channelRoute.GET("/ollama/version/:id", controller.OllamaVersion)
 			channelRoute.POST("/batch/tag", controller.BatchSetChannelTag)
 			channelRoute.GET("/tag/models", controller.GetTagModels)
 			channelRoute.POST("/copy/:id", controller.CopyChannel)
@@ -195,6 +220,7 @@ func SetApiRouter(router *gin.Engine) {
 		logRoute.DELETE("/", middleware.AdminAuth(), controller.DeleteHistoryLogs)
 		logRoute.GET("/stat", middleware.AdminAuth(), controller.GetLogsStat)
 		logRoute.GET("/self/stat", middleware.UserAuth(), controller.GetLogsSelfStat)
+		logRoute.GET("/channel_affinity_usage_cache", middleware.AdminAuth(), controller.GetChannelAffinityUsageCacheStats)
 		logRoute.GET("/search", middleware.AdminAuth(), controller.SearchAllLogs)
 		logRoute.GET("/self", middleware.UserAuth(), controller.GetUserLogs)
 		logRoute.GET("/self/search", middleware.UserAuth(), controller.SearchUserLogs)
@@ -255,6 +281,32 @@ func SetApiRouter(router *gin.Engine) {
 			modelsRoute.POST("/", controller.CreateModelMeta)
 			modelsRoute.PUT("/", controller.UpdateModelMeta)
 			modelsRoute.DELETE("/:id", controller.DeleteModelMeta)
+		}
+
+		// Deployments (model deployment management)
+		deploymentsRoute := apiRouter.Group("/deployments")
+		deploymentsRoute.Use(middleware.AdminAuth())
+		{
+			deploymentsRoute.GET("/settings", controller.GetModelDeploymentSettings)
+			deploymentsRoute.POST("/settings/test-connection", controller.TestIoNetConnection)
+			deploymentsRoute.GET("/", controller.GetAllDeployments)
+			deploymentsRoute.GET("/search", controller.SearchDeployments)
+			deploymentsRoute.POST("/test-connection", controller.TestIoNetConnection)
+			deploymentsRoute.GET("/hardware-types", controller.GetHardwareTypes)
+			deploymentsRoute.GET("/locations", controller.GetLocations)
+			deploymentsRoute.GET("/available-replicas", controller.GetAvailableReplicas)
+			deploymentsRoute.POST("/price-estimation", controller.GetPriceEstimation)
+			deploymentsRoute.GET("/check-name", controller.CheckClusterNameAvailability)
+			deploymentsRoute.POST("/", controller.CreateDeployment)
+
+			deploymentsRoute.GET("/:id", controller.GetDeployment)
+			deploymentsRoute.GET("/:id/logs", controller.GetDeploymentLogs)
+			deploymentsRoute.GET("/:id/containers", controller.ListDeploymentContainers)
+			deploymentsRoute.GET("/:id/containers/:container_id", controller.GetContainerDetails)
+			deploymentsRoute.PUT("/:id", controller.UpdateDeployment)
+			deploymentsRoute.PUT("/:id/name", controller.UpdateDeploymentName)
+			deploymentsRoute.POST("/:id/extend", controller.ExtendDeployment)
+			deploymentsRoute.DELETE("/:id", controller.DeleteDeployment)
 		}
 	}
 }

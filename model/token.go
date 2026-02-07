@@ -30,7 +30,7 @@ type Token struct {
 	Group              string         `json:"group" gorm:"default:''"`
 	TimeLimitEnabled   bool           `json:"time_limit_enabled" gorm:"default:false"`                // 是否启用时段限制
 	TimeLimitConfig    string         `json:"time_limit_config" gorm:"type:varchar(2048);default:''"` // 时段限制配置，JSON格式
-	CrossGroupRetry    bool           `json:"cross_group_retry" gorm:"default:false"`                 // 跨分组重试，仅auto分组有效
+	CrossGroupRetry    bool           `json:"cross_group_retry"`                                      // 跨分组重试，仅auto分组有效
 	DeletedAt          gorm.DeletedAt `gorm:"index"`
 }
 

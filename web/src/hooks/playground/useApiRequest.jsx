@@ -250,7 +250,10 @@ export const useApiRequest = (
         if (data.choices?.[0]) {
           const choice = data.choices[0];
           let content = choice.message?.content || '';
-          let reasoningContent = choice.message?.reasoning_content || choice.message?.reasoning || '';
+          let reasoningContent =
+            choice.message?.reasoning_content ||
+            choice.message?.reasoning ||
+            '';
 
           const processed = processThinkTags(content, reasoningContent);
 
