@@ -231,11 +231,11 @@ export const useApiRequest = (
         const endTime = Date.now();
         const data = await response.json();
 
-        // 提取usage信息并计算吞吐速率
+        // 提取usage信息并计算输出吞吐速率（输出token/s，含reasoning）
         const usage = data.usage || null;
         const elapsedSeconds = (endTime - startTime) / 1000;
-        const tokensPerSecond = usage?.total_tokens
-          ? (usage.total_tokens / elapsedSeconds).toFixed(2)
+        const tokensPerSecond = usage?.completion_tokens
+          ? (usage.completion_tokens / elapsedSeconds).toFixed(2)
           : null;
 
         setDebugData((prev) => ({
@@ -352,10 +352,10 @@ export const useApiRequest = (
           source.close();
           sseSourceRef.current = null;
 
-          // 计算吞吐速率
+          // 计算输出吞吐速率（输出token/s，含reasoning）
           const elapsedSeconds = (endTime - startTime) / 1000;
-          const tokensPerSecond = lastUsage?.total_tokens
-            ? (lastUsage.total_tokens / elapsedSeconds).toFixed(2)
+          const tokensPerSecond = lastUsage?.completion_tokens
+            ? (lastUsage.completion_tokens / elapsedSeconds).toFixed(2)
             : null;
 
           setDebugData((prev) => ({
