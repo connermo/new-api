@@ -21,7 +21,8 @@ func GetAllLogs(c *gin.Context) {
 	channel := c.Query("channel")
 	group := c.Query("group")
 	fuzzySearch := c.Query("fuzzy_search") == "1"
-	logs, total, err := model.GetAllLogs(logType, startTimestamp, endTimestamp, modelName, username, tokenName, pageInfo.GetStartIdx(), pageInfo.GetPageSize(), channel, group, fuzzySearch)
+	requestId := c.Query("request_id")
+	logs, total, err := model.GetAllLogs(logType, startTimestamp, endTimestamp, modelName, username, tokenName, pageInfo.GetStartIdx(), pageInfo.GetPageSize(), channel, group, fuzzySearch, requestId)
 	if err != nil {
 		common.ApiError(c, err)
 		return
@@ -42,7 +43,8 @@ func GetUserLogs(c *gin.Context) {
 	modelName := c.Query("model_name")
 	group := c.Query("group")
 	fuzzySearch := c.Query("fuzzy_search") == "1"
-	logs, total, err := model.GetUserLogs(userId, logType, startTimestamp, endTimestamp, modelName, tokenName, pageInfo.GetStartIdx(), pageInfo.GetPageSize(), group, fuzzySearch)
+	requestId := c.Query("request_id")
+	logs, total, err := model.GetUserLogs(userId, logType, startTimestamp, endTimestamp, modelName, tokenName, pageInfo.GetStartIdx(), pageInfo.GetPageSize(), group, fuzzySearch, requestId)
 	if err != nil {
 		common.ApiError(c, err)
 		return
@@ -53,40 +55,32 @@ func GetUserLogs(c *gin.Context) {
 	return
 }
 
+// Deprecated: SearchAllLogs 已废弃，前端未使用该接口。
 func SearchAllLogs(c *gin.Context) {
-	keyword := c.Query("keyword")
-	logs, err := model.SearchAllLogs(keyword)
-	if err != nil {
-		common.ApiError(c, err)
-		return
-	}
 	c.JSON(http.StatusOK, gin.H{
-		"success": true,
-		"message": "",
-		"data":    logs,
+		"success": false,
+		"message": "该接口已废弃",
 	})
-	return
 }
 
+// Deprecated: SearchUserLogs 已废弃，前端未使用该接口。
 func SearchUserLogs(c *gin.Context) {
-	keyword := c.Query("keyword")
-	userId := c.GetInt("id")
-	logs, err := model.SearchUserLogs(userId, keyword)
-	if err != nil {
-		common.ApiError(c, err)
-		return
-	}
 	c.JSON(http.StatusOK, gin.H{
-		"success": true,
-		"message": "",
-		"data":    logs,
+		"success": false,
+		"message": "该接口已废弃",
 	})
-	return
 }
 
 func GetLogByKey(c *gin.Context) {
-	key := c.Query("key")
-	logs, err := model.GetLogByKey(key)
+	tokenId := c.GetInt("token_id")
+	if tokenId == 0 {
+		c.JSON(200, gin.H{
+			"success": false,
+			"message": "无效的令牌",
+		})
+		return
+	}
+	logs, err := model.GetLogByTokenId(tokenId)
 	if err != nil {
 		c.JSON(200, gin.H{
 			"success": false,
@@ -111,7 +105,11 @@ func GetLogsStat(c *gin.Context) {
 	channel := c.Query("channel")
 	group := c.Query("group")
 	fuzzySearch := c.Query("fuzzy_search") == "1"
-	stat := model.SumUsedQuota(logType, startTimestamp, endTimestamp, modelName, username, tokenName, channel, group, fuzzySearch)
+	stat, err := model.SumUsedQuota(logType, startTimestamp, endTimestamp, modelName, username, tokenName, channel, group, fuzzySearch)
+	if err != nil {
+		common.ApiError(c, err)
+		return
+	}
 	//tokenNum := model.SumUsedToken(logType, startTimestamp, endTimestamp, modelName, username, "")
 	c.JSON(http.StatusOK, gin.H{
 		"success": true,
@@ -135,7 +133,11 @@ func GetLogsSelfStat(c *gin.Context) {
 	channel := c.Query("channel")
 	group := c.Query("group")
 	fuzzySearch := c.Query("fuzzy_search") == "1"
-	quotaNum := model.SumUsedQuota(logType, startTimestamp, endTimestamp, modelName, username, tokenName, channel, group, fuzzySearch)
+	quotaNum, err := model.SumUsedQuota(logType, startTimestamp, endTimestamp, modelName, username, tokenName, channel, group, fuzzySearch)
+	if err != nil {
+		common.ApiError(c, err)
+		return
+	}
 	//tokenNum := model.SumUsedToken(logType, startTimestamp, endTimestamp, modelName, username, tokenName)
 	c.JSON(200, gin.H{
 		"success": true,

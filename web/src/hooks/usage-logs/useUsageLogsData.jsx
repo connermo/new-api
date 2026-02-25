@@ -94,6 +94,7 @@ export const useLogsData = () => {
     model_name: '',
     channel: '',
     group: '',
+    request_id: '',
     dateRange: [
       timestamp2string(getTodayStartTimestamp()),
       timestamp2string(now.getTime() / 1000 + 3600),
@@ -231,6 +232,7 @@ export const useLogsData = () => {
       end_timestamp,
       channel: formValues.channel || '',
       group: formValues.group || '',
+      request_id: formValues.request_id || '',
       logType: formValues.logType ? parseInt(formValues.logType) : 0,
       fuzzy_search: formValues.fuzzy_search !== undefined ? formValues.fuzzy_search : true,
     };
@@ -352,6 +354,12 @@ export const useLogsData = () => {
         expandDataLocal.push({
           key: t('渠道信息'),
           value: `${logs[i].channel} - ${logs[i].channel_name || '[未知]'}`,
+        });
+      }
+      if (logs[i].request_id) {
+        expandDataLocal.push({
+          key: t('Request ID'),
+          value: logs[i].request_id,
         });
       }
       if (other?.ws || other?.audio) {
@@ -539,6 +547,55 @@ export const useLogsData = () => {
           value: other.request_path,
         });
       }
+      if (other?.billing_source === 'subscription') {
+        const planId = other?.subscription_plan_id;
+        const planTitle = other?.subscription_plan_title || '';
+        const subscriptionId = other?.subscription_id;
+        const unit = t('额度');
+        const pre = other?.subscription_pre_consumed ?? 0;
+        const postDelta = other?.subscription_post_delta ?? 0;
+        const finalConsumed = other?.subscription_consumed ?? pre + postDelta;
+        const remain = other?.subscription_remain;
+        const total = other?.subscription_total;
+        // Use multiple Description items to avoid an overlong single line.
+        if (planId) {
+          expandDataLocal.push({
+            key: t('订阅套餐'),
+            value: `#${planId} ${planTitle}`.trim(),
+          });
+        }
+        if (subscriptionId) {
+          expandDataLocal.push({
+            key: t('订阅实例'),
+            value: `#${subscriptionId}`,
+          });
+        }
+        const settlementLines = [
+          `${t('预扣')}：${pre} ${unit}`,
+          `${t('结算差额')}：${postDelta > 0 ? '+' : ''}${postDelta} ${unit}`,
+          `${t('最终抵扣')}：${finalConsumed} ${unit}`,
+        ]
+          .filter(Boolean)
+          .join('\n');
+        expandDataLocal.push({
+          key: t('订阅结算'),
+          value: (
+            <div style={{ whiteSpace: 'pre-line' }}>{settlementLines}</div>
+          ),
+        });
+        if (remain !== undefined && total !== undefined) {
+          expandDataLocal.push({
+            key: t('订阅剩余'),
+            value: `${remain}/${total} ${unit}`,
+          });
+        }
+        expandDataLocal.push({
+          key: t('订阅说明'),
+          value: t(
+            'token 会按倍率换算成“额度/次数”，请求结束后再做差额结算（补扣/返还）。',
+          ),
+        });
+      }
       if (isAdminUser) {
         expandDataLocal.push({
           key: t('请求转换'),
@@ -577,6 +634,7 @@ export const useLogsData = () => {
       end_timestamp,
       channel,
       group,
+      request_id,
       logType: formLogType,
       fuzzy_search,
     } = getFormValues();
@@ -592,9 +650,9 @@ export const useLogsData = () => {
     let localEndTimestamp = Date.parse(end_timestamp) / 1000;
     const fuzzyParam = fuzzy_search ? '1' : '0';
     if (isAdminUser) {
-      url = `/api/log/?p=${startIdx}&page_size=${pageSize}&type=${currentLogType}&username=${username}&token_name=${token_name}&model_name=${model_name}&start_timestamp=${localStartTimestamp}&end_timestamp=${localEndTimestamp}&channel=${channel}&group=${group}&fuzzy_search=${fuzzyParam}`;
+      url = `/api/log/?p=${startIdx}&page_size=${pageSize}&type=${currentLogType}&username=${username}&token_name=${token_name}&model_name=${model_name}&start_timestamp=${localStartTimestamp}&end_timestamp=${localEndTimestamp}&channel=${channel}&group=${group}&fuzzy_search=${fuzzyParam}&request_id=${request_id}`;
     } else {
-      url = `/api/log/self/?p=${startIdx}&page_size=${pageSize}&type=${currentLogType}&token_name=${token_name}&model_name=${model_name}&start_timestamp=${localStartTimestamp}&end_timestamp=${localEndTimestamp}&group=${group}&fuzzy_search=${fuzzyParam}`;
+      url = `/api/log/self/?p=${startIdx}&page_size=${pageSize}&type=${currentLogType}&token_name=${token_name}&model_name=${model_name}&start_timestamp=${localStartTimestamp}&end_timestamp=${localEndTimestamp}&group=${group}&fuzzy_search=${fuzzyParam}&request_id=${request_id}`;
     }
     url = encodeURI(url);
     const res = await API.get(url);
