@@ -17,7 +17,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 
-import React from 'react';
+import React, { useMemo } from 'react';
 import { Card, Tabs, TabPane, Table } from '@douyinfe/semi-ui';
 import { PieChart } from 'lucide-react';
 import { VChart } from '@visactor/react-vchart';
@@ -37,7 +37,7 @@ const ChartsPanel = ({
   hasApiInfoPanel,
   t,
 }) => {
-  const tableColumns = [
+  const tableColumns = useMemo(() => [
     {
       title: t('模型名称'),
       dataIndex: 'model_name',
@@ -60,12 +60,17 @@ const ChartsPanel = ({
     },
     {
       title: t('模型描述'),
+      dataIndex: 'description',
+      key: 'description',
+    },
+    {
+      title: t('总消耗额度'),
       dataIndex: 'total_quota',
       key: 'total_quota',
       sorter: (a, b) => a.total_quota - b.total_quota,
       render: (text) => renderQuota(text, 4),
     },
-  ];
+  ], [t]);
 
   return (
     <Card

@@ -17,7 +17,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { initVChartSemiTheme } from '@visactor/vchart-semi-theme';
 import {
   modelColorMap,
@@ -47,7 +47,12 @@ export const useDashboardCharts = (
   setModelColors,
   setModelTableData,
   t,
+  modelDescriptions,
 ) => {
+  const modelDescriptionsRef = useRef(modelDescriptions);
+  useEffect(() => {
+    modelDescriptionsRef.current = modelDescriptions;
+  }, [modelDescriptions]);
   // ========== 图表规格状态 ==========
   const [spec_pie, setSpecPie] = useState({
     type: 'pie',
@@ -428,6 +433,7 @@ export const useDashboardCharts = (
       const tableData = Array.from(modelStats.values()).map((item, index) => ({
         key: index,
         ...item,
+        description: modelDescriptionsRef.current?.[item.model_name] || '',
       }));
 
       setModelTableData(tableData);

@@ -72,6 +72,7 @@ const Dashboard = () => {
     dashboardData.setModelColors,
     dashboardData.setModelTableData,
     dashboardData.t,
+    dashboardData.modelDescriptions,
   );
 
   // ========== 统计数据 ==========

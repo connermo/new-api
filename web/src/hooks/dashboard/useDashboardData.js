@@ -61,6 +61,7 @@ export const useDashboardData = (userState, userDispatch, statusState) => {
   const [lineData, setLineData] = useState([]);
   const [modelColors, setModelColors] = useState({});
   const [modelTableData, setModelTableData] = useState([]);
+  const [modelDescriptions, setModelDescriptions] = useState({});
 
   // ========== 图表状态 ==========
   const [activeChartTab, setActiveChartTab] = useState('1');
@@ -224,6 +225,24 @@ export const useDashboardData = (userState, userDispatch, statusState) => {
     }
   }, [userDispatch]);
 
+  const loadModelDescriptions = useCallback(async () => {
+    try {
+      const res = await API.get('/api/pricing');
+      const { success, data } = res.data;
+      if (success && Array.isArray(data)) {
+        const descMap = {};
+        data.forEach((model) => {
+          if (model.model_name && model.description) {
+            descMap[model.model_name] = model.description;
+          }
+        });
+        setModelDescriptions(descMap);
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  }, []);
+
   const refresh = useCallback(async () => {
     const data = await loadQuotaData();
     await loadUptimeData();
@@ -252,9 +271,10 @@ export const useDashboardData = (userState, userDispatch, statusState) => {
   useEffect(() => {
     if (!initialized.current) {
       getUserData();
+      loadModelDescriptions();
       initialized.current = true;
     }
-  }, [getUserData]);
+  }, [getUserData, loadModelDescriptions]);
 
   return {
     // 基础状态
@@ -282,6 +302,7 @@ export const useDashboardData = (userState, userDispatch, statusState) => {
     setModelColors,
     modelTableData,
     setModelTableData,
+    modelDescriptions,
 
     // 图表状态
     activeChartTab,
