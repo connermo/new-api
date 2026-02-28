@@ -21,7 +21,7 @@ import React, { useMemo } from 'react';
 import { Card, Tabs, TabPane, Table } from '@douyinfe/semi-ui';
 import { PieChart } from 'lucide-react';
 import { VChart } from '@visactor/react-vchart';
-import { renderNumber, renderQuota } from '../../helpers';
+import { renderNumber } from '../../helpers';
 
 const ChartsPanel = ({
   activeChartTab,
@@ -62,13 +62,6 @@ const ChartsPanel = ({
       title: t('模型描述'),
       dataIndex: 'description',
       key: 'description',
-    },
-    {
-      title: t('总消耗额度'),
-      dataIndex: 'total_quota',
-      key: 'total_quota',
-      sorter: (a, b) => a.total_quota - b.total_quota,
-      render: (text) => renderQuota(text, 4),
     },
   ], [t]);
 
