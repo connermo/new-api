@@ -227,11 +227,11 @@ export const useDashboardData = (userState, userDispatch, statusState) => {
 
   const loadModelDescriptions = useCallback(async () => {
     try {
-      const res = await API.get('/api/pricing');
+      const res = await API.get('/api/models/?p=1&page_size=10000');
       const { success, data } = res.data;
-      if (success && Array.isArray(data)) {
+      if (success && Array.isArray(data?.items)) {
         const descMap = {};
-        data.forEach((model) => {
+        data.items.forEach((model) => {
           if (model.model_name && model.description) {
             descMap[model.model_name] = model.description;
           }
@@ -275,6 +275,18 @@ export const useDashboardData = (userState, userDispatch, statusState) => {
       initialized.current = true;
     }
   }, [getUserData, loadModelDescriptions]);
+
+  // 当 pricing 数据比 quota 数据晚到时，补充描述到已有的 modelTableData
+  useEffect(() => {
+    if (Object.keys(modelDescriptions).length === 0) return;
+    setModelTableData((prev) => {
+      if (prev.length === 0) return prev;
+      return prev.map((item) => ({
+        ...item,
+        description: modelDescriptions[item.model_name] || item.description || '',
+      }));
+    });
+  }, [modelDescriptions]);
 
   return {
     // 基础状态
