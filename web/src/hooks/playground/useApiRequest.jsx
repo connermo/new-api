@@ -404,8 +404,7 @@ export const useApiRequest = (
 
             if (delta.reasoning_content) {
               streamMessageUpdate(delta.reasoning_content, 'reasoning');
-            }
-            if (delta.reasoning) {
+            } else if (delta.reasoning) {
               streamMessageUpdate(delta.reasoning, 'reasoning');
             }
             if (delta.content) {
