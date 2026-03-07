@@ -39,6 +39,13 @@ const ChartsPanel = ({
 }) => {
   const tableColumns = useMemo(() => [
     {
+      title: '#',
+      key: 'index',
+      width: 50,
+      fixed: 'left',
+      render: (text, record, index) => index + 1,
+    },
+    {
       title: t('模型名称'),
       dataIndex: 'model_name',
       key: 'model_name',
@@ -57,11 +64,6 @@ const ChartsPanel = ({
       key: 'total_tokens',
       sorter: (a, b) => a.total_tokens - b.total_tokens,
       render: (text) => renderNumber(text),
-    },
-    {
-      title: t('模型描述'),
-      dataIndex: 'description',
-      key: 'description',
     },
   ], [t]);
 
