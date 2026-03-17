@@ -204,9 +204,6 @@ var defaultModelRatio = map[string]float64{
 	"qwen-turbo":                                0.8572, // ￥0.012 / 1k tokens
 	"qwen-plus":                                 10,     // ￥0.14 / 1k tokens
 	"text-embedding-v1":                         0.05,   // ￥0.0007 / 1k tokens
-	"text-embedding-v2":                         0.04,   // ￥0.0005 / 1k tokens (estimated)
-	"text-embedding-v3":                         0.04,   // ￥0.0005 / 1k tokens (estimated)
-	"text-embedding-v4":                         0.0357, // ￥0.0005 / 1k tokens
 	"SparkDesk-v1.1":                            1.2858, // ￥0.018 / 1k tokens
 	"SparkDesk-v2.1":                            1.2858, // ￥0.018 / 1k tokens
 	"SparkDesk-v3.1":                            1.2858, // ￥0.018 / 1k tokens
@@ -453,6 +450,44 @@ func GetCompletionRatio(name string) float64 {
 		return ratio
 	}
 	return hardCodedRatio
+}
+
+type CompletionRatioInfo struct {
+	Ratio  float64 `json:"ratio"`
+	Locked bool    `json:"locked"`
+}
+
+func GetCompletionRatioInfo(name string) CompletionRatioInfo {
+	name = FormatMatchingModelName(name)
+
+	if strings.Contains(name, "/") {
+		if ratio, ok := completionRatioMap.Get(name); ok {
+			return CompletionRatioInfo{
+				Ratio:  ratio,
+				Locked: false,
+			}
+		}
+	}
+
+	hardCodedRatio, locked := getHardcodedCompletionModelRatio(name)
+	if locked {
+		return CompletionRatioInfo{
+			Ratio:  hardCodedRatio,
+			Locked: true,
+		}
+	}
+
+	if ratio, ok := completionRatioMap.Get(name); ok {
+		return CompletionRatioInfo{
+			Ratio:  ratio,
+			Locked: false,
+		}
+	}
+
+	return CompletionRatioInfo{
+		Ratio:  hardCodedRatio,
+		Locked: false,
+	}
 }
 
 func getHardcodedCompletionModelRatio(name string) (float64, bool) {

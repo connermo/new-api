@@ -17,7 +17,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 
-import { useState, useCallback, useEffect, useRef } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { initVChartSemiTheme } from '@visactor/vchart-semi-theme';
 import {
   modelColorMap,
@@ -45,14 +45,8 @@ export const useDashboardCharts = (
   setPieData,
   setLineData,
   setModelColors,
-  setModelTableData,
   t,
-  modelDescriptions,
 ) => {
-  const modelDescriptionsRef = useRef(modelDescriptions);
-  useEffect(() => {
-    modelDescriptionsRef.current = modelDescriptions;
-  }, [modelDescriptions]);
   // ========== 图表规格状态 ==========
   const [spec_pie, setSpecPie] = useState({
     type: 'pie',
@@ -412,31 +406,6 @@ export const useDashboardCharts = (
         'rankData',
       );
 
-      // ===== 模型统计表格数据 =====
-      const modelStats = new Map();
-      data.forEach((item) => {
-        const model = item.model_name;
-        if (!modelStats.has(model)) {
-          modelStats.set(model, {
-            model_name: model,
-            call_count: 0,
-            total_tokens: 0,
-            total_quota: 0,
-          });
-        }
-        const stats = modelStats.get(model);
-        stats.call_count += item.count;
-        stats.total_tokens += item.token_used;
-        stats.total_quota += item.quota;
-      });
-
-      const tableData = Array.from(modelStats.values()).map((item, index) => ({
-        key: index,
-        ...item,
-        description: modelDescriptionsRef.current?.[item.model_name] || '',
-      }));
-
-      setModelTableData(tableData);
       setPieData(newPieData);
       setLineData(newLineData);
       setConsumeQuota(totalQuota);
@@ -453,7 +422,6 @@ export const useDashboardCharts = (
       setConsumeQuota,
       setTimes,
       setConsumeTokens,
-      setModelTableData,
       t,
     ],
   );

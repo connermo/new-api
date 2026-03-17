@@ -30,7 +30,6 @@ const ChatArea = ({
   styleState,
   showDebugPanel,
   roleInfo,
-  debugData,
   onMessageSend,
   onMessageCopy,
   onMessageReset,
@@ -95,7 +94,7 @@ const ChatArea = ({
       )}
 
       {/* 聊天内容区域 */}
-      <div className='flex-1 overflow-hidden flex flex-col'>
+      <div className='flex-1 overflow-hidden'>
         <Chat
           ref={chatRef}
           chatBoxRenderConfig={{
@@ -119,7 +118,7 @@ const ChatArea = ({
           showStopGenerate
           onStopGenerator={onStopGenerator}
           onClear={onClearMessages}
-          className='flex-1'
+          className='h-full'
           placeholder={t('请输入您的问题...')}
         />
       </div>

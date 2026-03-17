@@ -181,7 +181,7 @@ func SearchUserTopUps(userId int, keyword string, pageInfo *common.PageInfo) (to
 
 	query := tx.Model(&TopUp{}).Where("user_id = ?", userId)
 	if keyword != "" {
-		like := "%" + keyword + "%"
+		like := "%%" + keyword + "%%"
 		query = query.Where("trade_no LIKE ?", like)
 	}
 
@@ -215,7 +215,7 @@ func SearchAllTopUps(keyword string, pageInfo *common.PageInfo) (topups []*TopUp
 
 	query := tx.Model(&TopUp{})
 	if keyword != "" {
-		like := "%" + keyword + "%"
+		like := "%%" + keyword + "%%"
 		query = query.Where("trade_no LIKE ?", like)
 	}
 

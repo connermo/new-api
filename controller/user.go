@@ -770,17 +770,12 @@ func DeleteUser(c *gin.Context) {
 	}
 	err = model.HardDeleteUserById(id)
 	if err != nil {
-		common.ApiError(c, err)
+		c.JSON(http.StatusOK, gin.H{
+			"success": true,
+			"message": "",
+		})
 		return
 	}
-	
-	adminId := c.GetInt("id")
-	model.RecordLog(adminId, model.LogTypeManage, fmt.Sprintf("管理员删除用户：%s (ID: %d)", originUser.Username, originUser.Id))
-	
-	c.JSON(http.StatusOK, gin.H{
-		"success": true,
-		"message": "",
-	})
 }
 
 func DeleteSelf(c *gin.Context) {
@@ -835,9 +830,6 @@ func CreateUser(c *gin.Context) {
 		common.ApiError(c, err)
 		return
 	}
-
-	adminId := c.GetInt("id")
-	model.RecordLog(adminId, model.LogTypeManage, fmt.Sprintf("管理员创建用户：%s", cleanUser.Username))
 
 	c.JSON(http.StatusOK, gin.H{
 		"success": true,
@@ -921,24 +913,6 @@ func ManageUser(c *gin.Context) {
 		common.ApiError(c, err)
 		return
 	}
-	
-	// 记录管理日志
-	adminId := c.GetInt("id")
-	var actionDescription string
-	switch req.Action {
-	case "disable":
-		actionDescription = fmt.Sprintf("管理员禁用用户：%s (ID: %d)", user.Username, user.Id)
-	case "enable":
-		actionDescription = fmt.Sprintf("管理员启用用户：%s (ID: %d)", user.Username, user.Id)
-	case "delete":
-		actionDescription = fmt.Sprintf("管理员删除用户：%s (ID: %d)", user.Username, user.Id)
-	case "promote":
-		actionDescription = fmt.Sprintf("管理员提升用户权限：%s (ID: %d) 提升为管理员", user.Username, user.Id)
-	case "demote":
-		actionDescription = fmt.Sprintf("管理员降级用户权限：%s (ID: %d) 降级为普通用户", user.Username, user.Id)
-	}
-	model.RecordLog(adminId, model.LogTypeManage, actionDescription)
-	
 	clearUser := model.User{
 		Role:   user.Role,
 		Status: user.Status,

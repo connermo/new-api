@@ -60,8 +60,6 @@ export const useDashboardData = (userState, userDispatch, statusState) => {
   const [pieData, setPieData] = useState([{ type: 'null', value: '0' }]);
   const [lineData, setLineData] = useState([]);
   const [modelColors, setModelColors] = useState({});
-  const [modelTableData, setModelTableData] = useState([]);
-  const [modelDescriptions, setModelDescriptions] = useState({});
 
   // ========== 图表状态 ==========
   const [activeChartTab, setActiveChartTab] = useState('1');
@@ -225,24 +223,6 @@ export const useDashboardData = (userState, userDispatch, statusState) => {
     }
   }, [userDispatch]);
 
-  const loadModelDescriptions = useCallback(async () => {
-    try {
-      const res = await API.get('/api/models/?p=1&page_size=10000');
-      const { success, data } = res.data;
-      if (success && Array.isArray(data?.items)) {
-        const descMap = {};
-        data.items.forEach((model) => {
-          if (model.model_name && model.description) {
-            descMap[model.model_name] = model.description;
-          }
-        });
-        setModelDescriptions(descMap);
-      }
-    } catch (err) {
-      console.error(err);
-    }
-  }, []);
-
   const refresh = useCallback(async () => {
     const data = await loadQuotaData();
     await loadUptimeData();
@@ -271,22 +251,9 @@ export const useDashboardData = (userState, userDispatch, statusState) => {
   useEffect(() => {
     if (!initialized.current) {
       getUserData();
-      loadModelDescriptions();
       initialized.current = true;
     }
-  }, [getUserData, loadModelDescriptions]);
-
-  // 当 pricing 数据比 quota 数据晚到时，补充描述到已有的 modelTableData
-  useEffect(() => {
-    if (Object.keys(modelDescriptions).length === 0) return;
-    setModelTableData((prev) => {
-      if (prev.length === 0) return prev;
-      return prev.map((item) => ({
-        ...item,
-        description: modelDescriptions[item.model_name] || item.description || '',
-      }));
-    });
-  }, [modelDescriptions]);
+  }, [getUserData]);
 
   return {
     // 基础状态
@@ -312,9 +279,6 @@ export const useDashboardData = (userState, userDispatch, statusState) => {
     setLineData,
     modelColors,
     setModelColors,
-    modelTableData,
-    setModelTableData,
-    modelDescriptions,
 
     // 图表状态
     activeChartTab,

@@ -8,9 +8,6 @@ var ModelList = []string{
 	"qwq-32b",
 	"qwen3-235b-a22b",
 	"text-embedding-v1",
-	"text-embedding-v2",
-	"text-embedding-v3",
-	"text-embedding-v4",
 	"gte-rerank-v2",
 }
 

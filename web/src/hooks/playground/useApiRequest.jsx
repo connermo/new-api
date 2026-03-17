@@ -136,7 +136,7 @@ export const useApiRequest = (
 
   // 完成消息
   const completeMessage = useCallback(
-    (status = MESSAGE_STATUS.COMPLETE, performanceData = {}) => {
+    (status = MESSAGE_STATUS.COMPLETE) => {
       setMessage((prevMessage) => {
         const lastMessage = prevMessage[prevMessage.length - 1];
         if (
@@ -154,9 +154,6 @@ export const useApiRequest = (
             ...lastMessage,
             status: status,
             ...autoCollapseState,
-            usage: performanceData.usage,
-            tokensPerSecond: performanceData.tokensPerSecond,
-            firstTokenTime: performanceData.firstTokenTime,
           },
         ];
 
@@ -177,7 +174,6 @@ export const useApiRequest = (
   // 非流式请求
   const handleNonStreamRequest = useCallback(
     async (payload) => {
-      const startTime = Date.now();
       setDebugData((prev) => ({
         ...prev,
         request: payload,
@@ -185,10 +181,6 @@ export const useApiRequest = (
         response: null,
         sseMessages: null, // 非流式请求清除 SSE 消息
         isStreaming: false,
-        usage: null,
-        requestStartTime: startTime,
-        requestEndTime: null,
-        tokensPerSecond: null,
       }));
       setActiveDebugTab(DEBUG_TABS.REQUEST);
 
@@ -228,22 +220,11 @@ export const useApiRequest = (
           );
         }
 
-        const endTime = Date.now();
         const data = await response.json();
-
-        // 提取usage信息并计算输出吞吐速率（输出token/s，含reasoning）
-        const usage = data.usage || null;
-        const elapsedSeconds = (endTime - startTime) / 1000;
-        const tokensPerSecond = usage?.completion_tokens
-          ? (usage.completion_tokens / elapsedSeconds).toFixed(2)
-          : null;
 
         setDebugData((prev) => ({
           ...prev,
           response: JSON.stringify(data, null, 2),
-          usage,
-          requestEndTime: endTime,
-          tokensPerSecond,
         }));
         setActiveDebugTab(DEBUG_TABS.RESPONSE);
 
@@ -272,9 +253,6 @@ export const useApiRequest = (
                 reasoningContent: processed.reasoningContent,
                 status: MESSAGE_STATUS.COMPLETE,
                 ...autoCollapseState,
-                usage,
-                tokensPerSecond,
-                firstTokenTime: null, // 非流式请求没有首字延迟
               };
             }
             return newMessages;
@@ -313,7 +291,6 @@ export const useApiRequest = (
   // SSE请求
   const handleSSE = useCallback(
     (payload) => {
-      const startTime = Date.now();
       setDebugData((prev) => ({
         ...prev,
         request: payload,
@@ -321,10 +298,6 @@ export const useApiRequest = (
         response: null,
         sseMessages: [], // 新增：存储 SSE 消息数组
         isStreaming: true, // 新增：标记流式状态
-        usage: null,
-        requestStartTime: startTime,
-        requestEndTime: null,
-        tokensPerSecond: null,
       }));
       setActiveDebugTab(DEBUG_TABS.REQUEST);
 
@@ -342,36 +315,19 @@ export const useApiRequest = (
       let responseData = '';
       let hasReceivedFirstResponse = false;
       let isStreamComplete = false; // 添加标志位跟踪流是否正常完成
-      let lastUsage = null; // 保存最后接收到的usage信息
-      let firstTokenTime = null; // 保存首字延迟
 
       source.addEventListener('message', (e) => {
         if (e.data === '[DONE]') {
           isStreamComplete = true; // 标记流正常完成
-          const endTime = Date.now();
           source.close();
           sseSourceRef.current = null;
-
-          // 计算输出吞吐速率（输出token/s，含reasoning）
-          const elapsedSeconds = (endTime - startTime) / 1000;
-          const tokensPerSecond = lastUsage?.completion_tokens
-            ? (lastUsage.completion_tokens / elapsedSeconds).toFixed(2)
-            : null;
-
           setDebugData((prev) => ({
             ...prev,
             response: responseData,
             sseMessages: [...(prev.sseMessages || []), '[DONE]'], // 添加 DONE 标记
             isStreaming: false,
-            usage: lastUsage,
-            requestEndTime: endTime,
-            tokensPerSecond,
           }));
-          completeMessage(MESSAGE_STATUS.COMPLETE, {
-            usage: lastUsage,
-            tokensPerSecond,
-            firstTokenTime,
-          });
+          completeMessage();
           return;
         }
 
@@ -384,11 +340,6 @@ export const useApiRequest = (
             hasReceivedFirstResponse = true;
           }
 
-          // 保存usage信息（通常在最后一条消息中）
-          if (payload.usage) {
-            lastUsage = payload.usage;
-          }
-
           // 新增：将 SSE 消息添加到数组
           setDebugData((prev) => ({
             ...prev,
@@ -397,14 +348,10 @@ export const useApiRequest = (
 
           const delta = payload.choices?.[0]?.delta;
           if (delta) {
-            // 记录首字延迟（第一次收到内容时）
-            if (firstTokenTime === null && (delta.reasoning_content || delta.reasoning || delta.content)) {
-              firstTokenTime = ((Date.now() - startTime) / 1000).toFixed(1);
-            }
-
             if (delta.reasoning_content) {
               streamMessageUpdate(delta.reasoning_content, 'reasoning');
-            } else if (delta.reasoning) {
+            }
+            if (delta.reasoning) {
               streamMessageUpdate(delta.reasoning, 'reasoning');
             }
             if (delta.content) {

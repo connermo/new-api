@@ -14,6 +14,23 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+func buildMaskedTokenResponse(token *model.Token) *model.Token {
+	if token == nil {
+		return nil
+	}
+	maskedToken := *token
+	maskedToken.Key = token.GetMaskedKey()
+	return &maskedToken
+}
+
+func buildMaskedTokenResponses(tokens []*model.Token) []*model.Token {
+	maskedTokens := make([]*model.Token, 0, len(tokens))
+	for _, token := range tokens {
+		maskedTokens = append(maskedTokens, buildMaskedTokenResponse(token))
+	}
+	return maskedTokens
+}
+
 func GetAllTokens(c *gin.Context) {
 	userId := c.GetInt("id")
 	pageInfo := common.GetPageQuery(c)
@@ -24,9 +41,8 @@ func GetAllTokens(c *gin.Context) {
 	}
 	total, _ := model.CountUserTokens(userId)
 	pageInfo.SetTotal(int(total))
-	pageInfo.SetItems(tokens)
+	pageInfo.SetItems(buildMaskedTokenResponses(tokens))
 	common.ApiSuccess(c, pageInfo)
-	return
 }
 
 func SearchTokens(c *gin.Context) {
@@ -42,9 +58,8 @@ func SearchTokens(c *gin.Context) {
 		return
 	}
 	pageInfo.SetTotal(int(total))
-	pageInfo.SetItems(tokens)
+	pageInfo.SetItems(buildMaskedTokenResponses(tokens))
 	common.ApiSuccess(c, pageInfo)
-	return
 }
 
 func GetToken(c *gin.Context) {
@@ -59,12 +74,24 @@ func GetToken(c *gin.Context) {
 		common.ApiError(c, err)
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{
-		"success": true,
-		"message": "",
-		"data":    token,
+	common.ApiSuccess(c, buildMaskedTokenResponse(token))
+}
+
+func GetTokenKey(c *gin.Context) {
+	id, err := strconv.Atoi(c.Param("id"))
+	userId := c.GetInt("id")
+	if err != nil {
+		common.ApiError(c, err)
+		return
+	}
+	token, err := model.GetTokenByIds(id, userId)
+	if err != nil {
+		common.ApiError(c, err)
+		return
+	}
+	common.ApiSuccess(c, gin.H{
+		"key": token.GetFullKey(),
 	})
-	return
 }
 
 func GetTokenStatus(c *gin.Context) {
@@ -148,30 +175,6 @@ func AddToken(c *gin.Context) {
 		common.ApiErrorI18n(c, i18n.MsgTokenNameTooLong)
 		return
 	}
-
-	// 验证时段限制配置
-	if token.TimeLimitEnabled && token.TimeLimitConfig != "" {
-		config, parseErr := token.GetTimeLimitConfig()
-		if parseErr != nil {
-			c.JSON(http.StatusOK, gin.H{
-				"success": false,
-				"message": "时段限制配置格式错误: " + parseErr.Error(),
-			})
-			return
-		}
-
-		// 验证每个规则
-		for _, rule := range config.Rules {
-			if err := model.ValidateTimeLimitRule(rule); err != nil {
-				c.JSON(http.StatusOK, gin.H{
-					"success": false,
-					"message": "时段限制规则验证失败: " + err.Error(),
-				})
-				return
-			}
-		}
-	}
-
 	// 非无限额度时，检查额度值是否超出有效范围
 	if !token.UnlimitedQuota {
 		if token.RemainQuota < 0 {
@@ -217,8 +220,6 @@ func AddToken(c *gin.Context) {
 		ModelLimits:        token.ModelLimits,
 		AllowIps:           token.AllowIps,
 		Group:              token.Group,
-		TimeLimitEnabled:   token.TimeLimitEnabled,
-		TimeLimitConfig:    token.TimeLimitConfig,
 		CrossGroupRetry:    token.CrossGroupRetry,
 	}
 	err = cleanToken.Insert()
@@ -226,41 +227,24 @@ func AddToken(c *gin.Context) {
 		common.ApiError(c, err)
 		return
 	}
-
-	userId := c.GetInt("id")
-	model.RecordLog(userId, model.LogTypeManage, fmt.Sprintf("用户创建令牌：%s", cleanToken.Name))
-
 	c.JSON(http.StatusOK, gin.H{
 		"success": true,
 		"message": "",
 	})
-	return
 }
 
 func DeleteToken(c *gin.Context) {
 	id, _ := strconv.Atoi(c.Param("id"))
 	userId := c.GetInt("id")
-
-	// 先获取令牌信息用于日志记录
-	token, err := model.GetTokenByIds(id, userId)
+	err := model.DeleteTokenById(id, userId)
 	if err != nil {
 		common.ApiError(c, err)
 		return
 	}
-
-	err = model.DeleteTokenById(id, userId)
-	if err != nil {
-		common.ApiError(c, err)
-		return
-	}
-
-	model.RecordLog(userId, model.LogTypeManage, fmt.Sprintf("用户删除令牌：%s (ID: %d)", token.Name, token.Id))
-
 	c.JSON(http.StatusOK, gin.H{
 		"success": true,
 		"message": "",
 	})
-	return
 }
 
 func UpdateToken(c *gin.Context) {
@@ -276,30 +260,6 @@ func UpdateToken(c *gin.Context) {
 		common.ApiErrorI18n(c, i18n.MsgTokenNameTooLong)
 		return
 	}
-
-	// 验证时段限制配置
-	if token.TimeLimitEnabled && token.TimeLimitConfig != "" {
-		config, parseErr := token.GetTimeLimitConfig()
-		if parseErr != nil {
-			c.JSON(http.StatusOK, gin.H{
-				"success": false,
-				"message": "时段限制配置格式错误: " + parseErr.Error(),
-			})
-			return
-		}
-
-		// 验证每个规则
-		for _, rule := range config.Rules {
-			if err := model.ValidateTimeLimitRule(rule); err != nil {
-				c.JSON(http.StatusOK, gin.H{
-					"success": false,
-					"message": "时段限制规则验证失败: " + err.Error(),
-				})
-				return
-			}
-		}
-	}
-
 	if !token.UnlimitedQuota {
 		if token.RemainQuota < 0 {
 			common.ApiErrorI18n(c, i18n.MsgTokenQuotaNegative)
@@ -338,8 +298,6 @@ func UpdateToken(c *gin.Context) {
 		cleanToken.ModelLimits = token.ModelLimits
 		cleanToken.AllowIps = token.AllowIps
 		cleanToken.Group = token.Group
-		cleanToken.TimeLimitEnabled = token.TimeLimitEnabled
-		cleanToken.TimeLimitConfig = token.TimeLimitConfig
 		cleanToken.CrossGroupRetry = token.CrossGroupRetry
 	}
 	err = cleanToken.Update()
@@ -347,23 +305,10 @@ func UpdateToken(c *gin.Context) {
 		common.ApiError(c, err)
 		return
 	}
-
-	if statusOnly == "true" {
-		var statusText string
-		if cleanToken.Status == common.TokenStatusEnabled {
-			statusText = "启用"
-		} else {
-			statusText = "禁用"
-		}
-		model.RecordLog(userId, model.LogTypeManage, fmt.Sprintf("用户%s令牌：%s (ID: %d)", statusText, cleanToken.Name, cleanToken.Id))
-	} else {
-		model.RecordLog(userId, model.LogTypeManage, fmt.Sprintf("用户更新令牌：%s (ID: %d)", cleanToken.Name, cleanToken.Id))
-	}
-
 	c.JSON(http.StatusOK, gin.H{
 		"success": true,
 		"message": "",
-		"data":    cleanToken,
+		"data":    buildMaskedTokenResponse(cleanToken),
 	})
 }
 
