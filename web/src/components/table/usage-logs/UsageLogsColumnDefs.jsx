@@ -510,13 +510,13 @@ export const getLogsColumns = ({
             record.type === 6) ? (
           <Space>
             <span style={{ position: 'relative', display: 'inline-block' }}>
-              <Tooltip content={record.channel_name || t('未知渠道')}>
+              <Tooltip content={record.channel_name ? `${record.channel_name} (ID: ${text})` : t('未知渠道')}>
                 <span>
                   <Tag
                     color={colors[parseInt(text) % colors.length]}
                     shape='circle'
                   >
-                    {text}
+                    {record.channel_name || `${t('渠道')} ${text}`}
                   </Tag>
                 </span>
               </Tooltip>

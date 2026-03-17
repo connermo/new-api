@@ -50,6 +50,15 @@ const (
 	LogTypeRefund  = 6
 )
 
+// getCaseInsensitiveLikeOperator returns the appropriate LIKE operator for case-insensitive search
+// PostgreSQL requires ILIKE, while MySQL and SQLite use LIKE (which is case-insensitive by default)
+func getCaseInsensitiveLikeOperator() string {
+	if common.UsingPostgreSQL || common.LogSqlType == common.DatabaseTypePostgreSQL {
+		return "ILIKE"
+	}
+	return "LIKE"
+}
+
 func formatUserLogs(logs []*Log, startIdx int) {
 	for i := range logs {
 		logs[i].ChannelName = ""
@@ -242,7 +251,7 @@ func RecordTaskBillingLog(params RecordTaskBillingLogParams) {
 	}
 }
 
-func GetAllLogs(logType int, startTimestamp int64, endTimestamp int64, modelName string, username string, tokenName string, startIdx int, num int, channel int, group string, requestId string) (logs []*Log, total int64, err error) {
+func GetAllLogs(logType int, startTimestamp int64, endTimestamp int64, modelName string, username string, tokenName string, startIdx int, num int, channel string, group string, requestId string, fuzzySearch bool) (logs []*Log, total int64, err error) {
 	var tx *gorm.DB
 	if logType == LogTypeUnknown {
 		tx = LOG_DB
@@ -251,13 +260,25 @@ func GetAllLogs(logType int, startTimestamp int64, endTimestamp int64, modelName
 	}
 
 	if modelName != "" {
-		tx = tx.Where("logs.model_name like ?", modelName)
+		if fuzzySearch {
+			tx = tx.Where("logs.model_name "+getCaseInsensitiveLikeOperator()+" ?", "%"+modelName+"%")
+		} else {
+			tx = tx.Where("logs.model_name = ?", modelName)
+		}
 	}
 	if username != "" {
-		tx = tx.Where("logs.username = ?", username)
+		if fuzzySearch {
+			tx = tx.Where("logs.username "+getCaseInsensitiveLikeOperator()+" ?", "%"+username+"%")
+		} else {
+			tx = tx.Where("logs.username = ?", username)
+		}
 	}
 	if tokenName != "" {
-		tx = tx.Where("logs.token_name = ?", tokenName)
+		if fuzzySearch {
+			tx = tx.Where("logs.token_name "+getCaseInsensitiveLikeOperator()+" ?", "%"+tokenName+"%")
+		} else {
+			tx = tx.Where("logs.token_name = ?", tokenName)
+		}
 	}
 	if requestId != "" {
 		tx = tx.Where("logs.request_id = ?", requestId)
@@ -268,11 +289,19 @@ func GetAllLogs(logType int, startTimestamp int64, endTimestamp int64, modelName
 	if endTimestamp != 0 {
 		tx = tx.Where("logs.created_at <= ?", endTimestamp)
 	}
-	if channel != 0 {
-		tx = tx.Where("logs.channel_id = ?", channel)
+	if channel != "" {
+		if fuzzySearch {
+			tx = tx.Joins("LEFT JOIN channels ON logs.channel_id = channels.id").Where("channels.name "+getCaseInsensitiveLikeOperator()+" ?", "%"+channel+"%")
+		} else {
+			tx = tx.Joins("LEFT JOIN channels ON logs.channel_id = channels.id").Where("channels.name = ?", channel)
+		}
 	}
 	if group != "" {
-		tx = tx.Where("logs."+logGroupCol+" = ?", group)
+		if fuzzySearch {
+			tx = tx.Where("logs."+logGroupCol+" "+getCaseInsensitiveLikeOperator()+" ?", "%"+group+"%")
+		} else {
+			tx = tx.Where("logs."+logGroupCol+" = ?", group)
+		}
 	}
 	err = tx.Model(&Log{}).Count(&total).Error
 	if err != nil {
@@ -328,7 +357,7 @@ func GetAllLogs(logType int, startTimestamp int64, endTimestamp int64, modelName
 
 const logSearchCountLimit = 10000
 
-func GetUserLogs(userId int, logType int, startTimestamp int64, endTimestamp int64, modelName string, tokenName string, startIdx int, num int, group string, requestId string) (logs []*Log, total int64, err error) {
+func GetUserLogs(userId int, logType int, startTimestamp int64, endTimestamp int64, modelName string, tokenName string, startIdx int, num int, group string, requestId string, fuzzySearch bool) (logs []*Log, total int64, err error) {
 	var tx *gorm.DB
 	if logType == LogTypeUnknown {
 		tx = LOG_DB.Where("logs.user_id = ?", userId)
@@ -337,14 +366,18 @@ func GetUserLogs(userId int, logType int, startTimestamp int64, endTimestamp int
 	}
 
 	if modelName != "" {
-		modelNamePattern, err := sanitizeLikePattern(modelName)
-		if err != nil {
-			return nil, 0, err
+		if fuzzySearch {
+			tx = tx.Where("logs.model_name "+getCaseInsensitiveLikeOperator()+" ?", "%"+modelName+"%")
+		} else {
+			tx = tx.Where("logs.model_name = ?", modelName)
 		}
-		tx = tx.Where("logs.model_name LIKE ? ESCAPE '!'", modelNamePattern)
 	}
 	if tokenName != "" {
-		tx = tx.Where("logs.token_name = ?", tokenName)
+		if fuzzySearch {
+			tx = tx.Where("logs.token_name "+getCaseInsensitiveLikeOperator()+" ?", "%"+tokenName+"%")
+		} else {
+			tx = tx.Where("logs.token_name = ?", tokenName)
+		}
 	}
 	if requestId != "" {
 		tx = tx.Where("logs.request_id = ?", requestId)
@@ -356,7 +389,11 @@ func GetUserLogs(userId int, logType int, startTimestamp int64, endTimestamp int
 		tx = tx.Where("logs.created_at <= ?", endTimestamp)
 	}
 	if group != "" {
-		tx = tx.Where("logs."+logGroupCol+" = ?", group)
+		if fuzzySearch {
+			tx = tx.Where("logs."+logGroupCol+" "+getCaseInsensitiveLikeOperator()+" ?", "%"+group+"%")
+		} else {
+			tx = tx.Where("logs."+logGroupCol+" = ?", group)
+		}
 	}
 	err = tx.Model(&Log{}).Limit(logSearchCountLimit).Count(&total).Error
 	if err != nil {
@@ -379,19 +416,31 @@ type Stat struct {
 	Tpm   int `json:"tpm"`
 }
 
-func SumUsedQuota(logType int, startTimestamp int64, endTimestamp int64, modelName string, username string, tokenName string, channel int, group string) (stat Stat, err error) {
+func SumUsedQuota(logType int, startTimestamp int64, endTimestamp int64, modelName string, username string, tokenName string, channel string, group string, fuzzySearch bool) (stat Stat, err error) {
 	tx := LOG_DB.Table("logs").Select("sum(quota) quota")
 
 	// 为rpm和tpm创建单独的查询
 	rpmTpmQuery := LOG_DB.Table("logs").Select("count(*) rpm, sum(prompt_tokens) + sum(completion_tokens) tpm")
 
 	if username != "" {
-		tx = tx.Where("username = ?", username)
-		rpmTpmQuery = rpmTpmQuery.Where("username = ?", username)
+		if fuzzySearch {
+			operator := getCaseInsensitiveLikeOperator()
+			tx = tx.Where("username "+operator+" ?", "%"+username+"%")
+			rpmTpmQuery = rpmTpmQuery.Where("username "+operator+" ?", "%"+username+"%")
+		} else {
+			tx = tx.Where("username = ?", username)
+			rpmTpmQuery = rpmTpmQuery.Where("username = ?", username)
+		}
 	}
 	if tokenName != "" {
-		tx = tx.Where("token_name = ?", tokenName)
-		rpmTpmQuery = rpmTpmQuery.Where("token_name = ?", tokenName)
+		if fuzzySearch {
+			operator := getCaseInsensitiveLikeOperator()
+			tx = tx.Where("token_name "+operator+" ?", "%"+tokenName+"%")
+			rpmTpmQuery = rpmTpmQuery.Where("token_name "+operator+" ?", "%"+tokenName+"%")
+		} else {
+			tx = tx.Where("token_name = ?", tokenName)
+			rpmTpmQuery = rpmTpmQuery.Where("token_name = ?", tokenName)
+		}
 	}
 	if startTimestamp != 0 {
 		tx = tx.Where("created_at >= ?", startTimestamp)
@@ -400,20 +449,34 @@ func SumUsedQuota(logType int, startTimestamp int64, endTimestamp int64, modelNa
 		tx = tx.Where("created_at <= ?", endTimestamp)
 	}
 	if modelName != "" {
-		modelNamePattern, err := sanitizeLikePattern(modelName)
-		if err != nil {
-			return stat, err
+		if fuzzySearch {
+			operator := getCaseInsensitiveLikeOperator()
+			tx = tx.Where("model_name "+operator+" ?", "%"+modelName+"%")
+			rpmTpmQuery = rpmTpmQuery.Where("model_name "+operator+" ?", "%"+modelName+"%")
+		} else {
+			tx = tx.Where("model_name = ?", modelName)
+			rpmTpmQuery = rpmTpmQuery.Where("model_name = ?", modelName)
 		}
-		tx = tx.Where("model_name LIKE ? ESCAPE '!'", modelNamePattern)
-		rpmTpmQuery = rpmTpmQuery.Where("model_name LIKE ? ESCAPE '!'", modelNamePattern)
 	}
-	if channel != 0 {
-		tx = tx.Where("channel_id = ?", channel)
-		rpmTpmQuery = rpmTpmQuery.Where("channel_id = ?", channel)
+	if channel != "" {
+		if fuzzySearch {
+			operator := getCaseInsensitiveLikeOperator()
+			tx = tx.Joins("LEFT JOIN channels ON logs.channel_id = channels.id").Where("channels.name "+operator+" ?", "%"+channel+"%")
+			rpmTpmQuery = rpmTpmQuery.Joins("LEFT JOIN channels ON logs.channel_id = channels.id").Where("channels.name "+operator+" ?", "%"+channel+"%")
+		} else {
+			tx = tx.Joins("LEFT JOIN channels ON logs.channel_id = channels.id").Where("channels.name = ?", channel)
+			rpmTpmQuery = rpmTpmQuery.Joins("LEFT JOIN channels ON logs.channel_id = channels.id").Where("channels.name = ?", channel)
+		}
 	}
 	if group != "" {
-		tx = tx.Where(logGroupCol+" = ?", group)
-		rpmTpmQuery = rpmTpmQuery.Where(logGroupCol+" = ?", group)
+		if fuzzySearch {
+			operator := getCaseInsensitiveLikeOperator()
+			tx = tx.Where(logGroupCol+" "+operator+" ?", "%"+group+"%")
+			rpmTpmQuery = rpmTpmQuery.Where(logGroupCol+" "+operator+" ?", "%"+group+"%")
+		} else {
+			tx = tx.Where(logGroupCol+" = ?", group)
+			rpmTpmQuery = rpmTpmQuery.Where(logGroupCol+" = ?", group)
+		}
 	}
 
 	tx = tx.Where("type = ?", LogTypeConsume)

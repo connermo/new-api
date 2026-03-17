@@ -145,6 +145,25 @@ const MessageActions = ({
           />
         </Tooltip>
       )}
+
+      {message.role === 'assistant' && !isLoading && message.usage && (
+        <div className='flex items-center gap-1 ml-2 text-xs text-gray-500'>
+          <span>
+            {t('输入')}:{message.usage.prompt_tokens || 0} {t('输出')}:
+            {message.usage.completion_tokens || 0}
+          </span>
+          {message.tokensPerSecond && (
+            <span>
+              | {t('吞吐')}:{message.tokensPerSecond} tokens/s
+            </span>
+          )}
+          {message.firstTokenTime && (
+            <span>
+              | {t('首字')}:{message.firstTokenTime}s
+            </span>
+          )}
+        </div>
+      )}
     </div>
   );
 };
