@@ -44,6 +44,7 @@ export default function SettingsMonitoring(props) {
       '100-199,300-399,401-407,409-499,500-503,505-523,525-599',
     'monitor_setting.auto_test_channel_enabled': false,
     'monitor_setting.auto_test_channel_minutes': 10,
+    'monitor_setting.channel_metrics_interval_seconds': 15,
   });
   const refForm = useRef();
   const [inputsRow, setInputsRow] = useState(inputs);
@@ -159,6 +160,24 @@ export default function SettingsMonitoring(props) {
                     setInputs({
                       ...inputs,
                       'monitor_setting.auto_test_channel_minutes':
+                        parseInt(value),
+                    })
+                  }
+                />
+              </Col>
+              <Col xs={24} sm={12} md={8} lg={8} xl={8}>
+                <Form.InputNumber
+                  label={t('GPU 负载指标轮询间隔')}
+                  step={1}
+                  min={5}
+                  suffix={t('秒')}
+                  extraText={t('拉取 vLLM/SGLang Prometheus 指标的间隔时间')}
+                  placeholder={'15'}
+                  field={'monitor_setting.channel_metrics_interval_seconds'}
+                  onChange={(value) =>
+                    setInputs({
+                      ...inputs,
+                      'monitor_setting.channel_metrics_interval_seconds':
                         parseInt(value),
                     })
                   }

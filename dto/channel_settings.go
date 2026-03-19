@@ -24,6 +24,10 @@ const (
 )
 
 type ChannelOtherSettings struct {
+	MetricsEnabled bool   `json:"metrics_enabled,omitempty"` // 是否启用 GPU 负载感知动态权重
+	MetricsURL     string `json:"metrics_url,omitempty"`     // Prometheus metrics endpoint, e.g. http://gpu:8000/metrics
+	MetricsType    string `json:"metrics_type,omitempty"`    // "vllm" or "sglang" (default "vllm")
+
 	AzureResponsesVersion                 string        `json:"azure_responses_version,omitempty"`
 	VertexKeyType                         VertexKeyType `json:"vertex_key_type,omitempty"` // "json" or "api_key"
 	OpenRouterEnterprise                  *bool         `json:"openrouter_enterprise,omitempty"`

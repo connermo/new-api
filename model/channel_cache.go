@@ -79,6 +79,13 @@ func InitChannelCache() {
 				}
 			}
 		}
+		// 保留 metrics 动态权重：如果旧渠道启用了 metrics，用旧的动态权重替代 DB 静态值
+		if oldChannel, ok := channelsIDM[i]; ok {
+			oldSettings := oldChannel.GetOtherSettings()
+			if oldSettings.MetricsEnabled && oldSettings.MetricsURL != "" {
+				channel.Weight = oldChannel.Weight
+			}
+		}
 	}
 	channelsIDM = newChannelId2channel
 	channelSyncLock.Unlock()
@@ -244,6 +251,29 @@ func CacheUpdateChannelStatus(id int, status int) {
 				}
 			}
 		}
+	}
+}
+
+// CacheGetAllChannels returns a snapshot of all cached channels (including disabled).
+func CacheGetAllChannels() []*Channel {
+	channelSyncLock.RLock()
+	defer channelSyncLock.RUnlock()
+	channels := make([]*Channel, 0, len(channelsIDM))
+	for _, ch := range channelsIDM {
+		channels = append(channels, ch)
+	}
+	return channels
+}
+
+// CacheUpdateChannelWeight updates the weight of a channel in the cache without writing to DB.
+func CacheUpdateChannelWeight(id int, weight uint) {
+	if !common.MemoryCacheEnabled {
+		return
+	}
+	channelSyncLock.Lock()
+	defer channelSyncLock.Unlock()
+	if ch, ok := channelsIDM[id]; ok {
+		ch.Weight = &weight
 	}
 }
 

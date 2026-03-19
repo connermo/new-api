@@ -204,6 +204,9 @@ const EditChannelModal = (props) => {
     allow_include_obfuscation: false,
     allow_inference_geo: false,
     claude_beta_query: false,
+    metrics_enabled: false,
+    metrics_url: '',
+    metrics_type: 'vllm',
     upstream_model_update_check_enabled: false,
     upstream_model_update_auto_sync_enabled: false,
     upstream_model_update_last_check_time: 0,
@@ -885,6 +888,9 @@ const EditChannelModal = (props) => {
           data.allow_inference_geo =
             parsedSettings.allow_inference_geo || false;
           data.claude_beta_query = parsedSettings.claude_beta_query || false;
+          data.metrics_enabled = parsedSettings.metrics_enabled === true;
+          data.metrics_url = parsedSettings.metrics_url || '';
+          data.metrics_type = parsedSettings.metrics_type || 'vllm';
           data.upstream_model_update_check_enabled =
             parsedSettings.upstream_model_update_check_enabled === true;
           data.upstream_model_update_auto_sync_enabled =
@@ -914,6 +920,9 @@ const EditChannelModal = (props) => {
           data.allow_include_obfuscation = false;
           data.allow_inference_geo = false;
           data.claude_beta_query = false;
+          data.metrics_enabled = false;
+          data.metrics_url = '';
+          data.metrics_type = 'vllm';
           data.upstream_model_update_check_enabled = false;
           data.upstream_model_update_auto_sync_enabled = false;
           data.upstream_model_update_last_check_time = 0;
@@ -931,6 +940,9 @@ const EditChannelModal = (props) => {
         data.allow_include_obfuscation = false;
         data.allow_inference_geo = false;
         data.claude_beta_query = false;
+        data.metrics_enabled = false;
+        data.metrics_url = '';
+        data.metrics_type = 'vllm';
         data.upstream_model_update_check_enabled = false;
         data.upstream_model_update_auto_sync_enabled = false;
         data.upstream_model_update_last_check_time = 0;
@@ -1738,6 +1750,16 @@ const EditChannelModal = (props) => {
       }
     }
 
+    settings.metrics_enabled = localInputs.metrics_enabled === true;
+    if (settings.metrics_enabled) {
+      settings.metrics_url = localInputs.metrics_url || '';
+      settings.metrics_type = localInputs.metrics_type || 'vllm';
+    } else {
+      delete settings.metrics_url;
+      delete settings.metrics_type;
+      delete settings.metrics_enabled;
+    }
+
     settings.upstream_model_update_check_enabled =
       localInputs.upstream_model_update_check_enabled === true;
     settings.upstream_model_update_auto_sync_enabled =
@@ -1782,6 +1804,9 @@ const EditChannelModal = (props) => {
     delete localInputs.allow_include_obfuscation;
     delete localInputs.allow_inference_geo;
     delete localInputs.claude_beta_query;
+    delete localInputs.metrics_enabled;
+    delete localInputs.metrics_url;
+    delete localInputs.metrics_type;
     delete localInputs.upstream_model_update_check_enabled;
     delete localInputs.upstream_model_update_auto_sync_enabled;
     delete localInputs.upstream_model_update_last_check_time;
@@ -3503,6 +3528,54 @@ const EditChannelModal = (props) => {
                           </>
                       )}
                     </div>
+
+                    <Form.Switch
+                      field='metrics_enabled'
+                      label={t('GPU 负载感知动态权重')}
+                      checkedText={t('开')}
+                      uncheckedText={t('关')}
+                      onChange={(value) =>
+                        handleChannelOtherSettingsChange(
+                          'metrics_enabled',
+                          value,
+                        )
+                      }
+                      extraText={t(
+                        '开启后定时拉取 vLLM/SGLang 的 Prometheus 指标，根据 GPU 负载动态调整渠道权重',
+                      )}
+                    />
+                    {inputs.metrics_enabled && (
+                      <>
+                        <Form.Input
+                          field='metrics_url'
+                          label={t('Metrics URL')}
+                          placeholder='http://gpu-server:8000/metrics'
+                          onChange={(value) =>
+                            handleChannelOtherSettingsChange(
+                              'metrics_url',
+                              value,
+                            )
+                          }
+                          extraText={t(
+                            'Prometheus metrics 端点地址',
+                          )}
+                        />
+                        <Form.Select
+                          field='metrics_type'
+                          label={t('Metrics 类型')}
+                          onChange={(value) =>
+                            handleChannelOtherSettingsChange(
+                              'metrics_type',
+                              value,
+                            )
+                          }
+                          style={{ width: '100%' }}
+                        >
+                          <Form.Select.Option value='vllm'>vLLM</Form.Select.Option>
+                          <Form.Select.Option value='sglang'>SGLang</Form.Select.Option>
+                        </Form.Select>
+                      </>
+                    )}
 
                     <div className='mb-4'>
                       <div className='flex items-center justify-between gap-2 mb-1'>
