@@ -328,6 +328,7 @@ const renderOperations = (
   setShowEdit,
   manageToken,
   refresh,
+  onShowStats,
   t,
 ) => {
   let chatsArray = [];
@@ -407,6 +408,14 @@ const renderOperations = (
       <Button
         type='tertiary'
         size='small'
+        onClick={() => onShowStats(record)}
+      >
+        {t('统计')}
+      </Button>
+
+      <Button
+        type='tertiary'
+        size='small'
         onClick={() => {
           setEditingToken(record);
           setShowEdit(true);
@@ -449,6 +458,7 @@ export const getTokensColumns = ({
   setEditingToken,
   setShowEdit,
   refresh,
+  onShowStats,
 }) => {
   return [
     {
@@ -527,6 +537,7 @@ export const getTokensColumns = ({
           setShowEdit,
           manageToken,
           refresh,
+          onShowStats,
           t,
         ),
     },

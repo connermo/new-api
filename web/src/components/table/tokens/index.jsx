@@ -39,6 +39,7 @@ import TokensFilters from './TokensFilters';
 import TokensDescription from './TokensDescription';
 import EditTokenModal from './modals/EditTokenModal';
 import CCSwitchModal from './modals/CCSwitchModal';
+import TokenStatsModal from './modals/TokenStatsModal';
 import { useTokensData } from '../../../hooks/tokens/useTokensData';
 import { useIsMobile } from '../../../hooks/common/useIsMobile';
 import { createCardProPagination } from '../../../helpers/utils';
@@ -66,6 +67,8 @@ function TokensPage() {
   const [prefillKey, setPrefillKey] = useState('');
   const [ccSwitchVisible, setCCSwitchVisible] = useState(false);
   const [ccSwitchKey, setCCSwitchKey] = useState('');
+  const [statsVisible, setStatsVisible] = useState(false);
+  const [statsToken, setStatsToken] = useState(null);
 
   // Keep latest data for handlers inside notifications
   useEffect(() => {
@@ -391,6 +394,13 @@ function TokensPage() {
         modelOptions={modelOptions}
       />
 
+      <TokenStatsModal
+        visible={statsVisible}
+        onClose={() => setStatsVisible(false)}
+        token={statsToken}
+        t={tokensData.t}
+      />
+
       <CardPro
         type='type1'
         descriptionArea={
@@ -434,7 +444,10 @@ function TokensPage() {
         })}
         t={tokensData.t}
       >
-        <TokensTable {...tokensData} />
+        <TokensTable {...tokensData} onShowStats={(record) => {
+          setStatsToken(record);
+          setStatsVisible(true);
+        }} />
       </CardPro>
     </>
   );
