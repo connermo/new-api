@@ -19,7 +19,7 @@ For commercial licensing, please contact support@quantumnous.com
 import { t } from 'i18next'
 
 import { ERROR_MESSAGES, MESSAGE_ROLES, MESSAGE_STATUS } from '../../constants'
-import type { ChatCompletionResponse, Message } from '../../types'
+import type { ChatCompletionResponse, Message, TokenUsage } from '../../types'
 import { parseThinkTags } from './message-reasoning-utils'
 import {
   completeAssistantTiming,
@@ -148,10 +148,17 @@ export function finalizeMessage(
   return completeReasoningTiming(finalized)
 }
 
-export function completeAssistantMessage(message: Message): Message {
+export function completeAssistantMessage(
+  message: Message,
+  metrics?: { usage?: TokenUsage; firstTokenMs?: number }
+): Message {
   return completeAssistantTiming({
     ...finalizeMessage(message),
     status: MESSAGE_STATUS.COMPLETE,
+    ...(metrics?.usage ? { usage: metrics.usage } : {}),
+    ...(metrics?.firstTokenMs !== undefined
+      ? { firstTokenMs: metrics.firstTokenMs }
+      : {}),
   })
 }
 
@@ -186,7 +193,8 @@ export function hasChatCompletionChoice(
 
 export function applyChatCompletionChoice(
   message: Message,
-  choice: ChatCompletionChoice
+  choice: ChatCompletionChoice,
+  usage?: TokenUsage
 ): Message {
   return completeAssistantTiming({
     ...finalizeMessage(
@@ -194,6 +202,7 @@ export function applyChatCompletionChoice(
       choice.message?.reasoning_content
     ),
     status: MESSAGE_STATUS.COMPLETE,
+    ...(usage ? { usage } : {}),
   })
 }
 
@@ -207,7 +216,7 @@ export function applyChatCompletionResponse(
     return null
   }
 
-  return applyChatCompletionChoice(message, choice)
+  return applyChatCompletionChoice(message, choice, response.usage)
 }
 
 /**

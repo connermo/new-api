@@ -54,6 +54,11 @@ export interface CommonLogFilters extends CommonFilters {
   username?: string
   requestId?: string
   upstreamRequestId?: string
+  /**
+   * Match model / token / group / username as a case-insensitive substring
+   * instead of an exact value. Defaults to enabled.
+   */
+  fuzzySearch?: boolean
 }
 
 /**
@@ -324,6 +329,8 @@ export interface GetLogsParams {
   group?: string
   request_id?: string
   upstream_request_id?: string
+  /** '1' enables case-insensitive substring matching on text filters */
+  fuzzy_search?: string
 }
 
 export interface GetLogsResponse {
@@ -348,6 +355,8 @@ export interface GetLogStatsParams {
   group?: string
   request_id?: string
   upstream_request_id?: string
+  /** '1' enables case-insensitive substring matching on text filters */
+  fuzzy_search?: string
 }
 
 export interface GetLogStatsResponse {

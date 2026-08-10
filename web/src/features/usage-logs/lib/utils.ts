@@ -215,6 +215,9 @@ export function buildApiParams(config: {
     ...(searchParams.upstreamRequestId
       ? { upstream_request_id: String(searchParams.upstreamRequestId) }
       : {}),
+    // Fuzzy matching is on unless explicitly turned off, so a bare keyword
+    // still matches substrings the way the filter inputs suggest.
+    fuzzy_search: searchParams.fuzzySearch === false ? '0' : '1',
     ...buildTimeRangeParams(searchParams, false),
   }
 

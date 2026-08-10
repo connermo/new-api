@@ -24,6 +24,8 @@ import { useState, useCallback, useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { Button } from '@/components/ui/button'
+import { Checkbox } from '@/components/ui/checkbox'
+import { Label } from '@/components/ui/label'
 import {
   Select,
   SelectContent,
@@ -87,6 +89,7 @@ function buildSearchSourceKey(values: {
   username?: unknown
   requestId?: unknown
   upstreamRequestId?: unknown
+  fuzzySearch?: unknown
   type?: unknown
 }) {
   return [
@@ -99,6 +102,7 @@ function buildSearchSourceKey(values: {
     values.username,
     values.requestId,
     values.upstreamRequestId,
+    values.fuzzySearch,
     Array.isArray(values.type) ? values.type.join(',') : values.type,
   ]
     .map((value) => String(value ?? ''))
@@ -132,6 +136,7 @@ export function CommonLogsFilterBar<TData>(
       username: searchParams.username,
       requestId: searchParams.requestId,
       upstreamRequestId: searchParams.upstreamRequestId,
+      fuzzySearch: searchParams.fuzzySearch,
       type: searchParams.type,
     }
     const filters: CommonLogFilters = {
@@ -146,6 +151,7 @@ export function CommonLogsFilterBar<TData>(
       username: searchParams.username || undefined,
       requestId: searchParams.requestId || undefined,
       upstreamRequestId: searchParams.upstreamRequestId || undefined,
+      fuzzySearch: searchParams.fuzzySearch !== false,
     }
     return {
       sourceKey: buildSearchSourceKey(sourceValues),
@@ -162,6 +168,7 @@ export function CommonLogsFilterBar<TData>(
     searchParams.username,
     searchParams.requestId,
     searchParams.upstreamRequestId,
+    searchParams.fuzzySearch,
     searchParams.type,
   ])
   const [draft, setDraft] = useState<CommonLogDraft>(() => searchState)
@@ -171,7 +178,10 @@ export function CommonLogsFilterBar<TData>(
   const logType = activeDraft.logType
 
   const handleChange = useCallback(
-    (field: keyof CommonLogFilters, value: Date | string | undefined) => {
+    (
+      field: keyof CommonLogFilters,
+      value: Date | string | boolean | undefined
+    ) => {
       setDraft((current) => {
         const base =
           current.sourceKey === searchState.sourceKey ? current : searchState
@@ -202,7 +212,11 @@ export function CommonLogsFilterBar<TData>(
 
   const handleReset = useCallback(() => {
     const { start, end } = getDefaultTimeRange()
-    const resetFilters: CommonLogFilters = { startTime: start, endTime: end }
+    const resetFilters: CommonLogFilters = {
+      startTime: start,
+      endTime: end,
+      fuzzySearch: true,
+    }
     const resetSearch = {
       type: [LOG_TYPE_ALL_VALUE],
       startTime: start.getTime(),
@@ -358,6 +372,23 @@ export function CommonLogsFilterBar<TData>(
       </Select>
     </LogsFilterField>
   )
+  const fuzzySearchFilter = (
+    <LogsFilterField className='flex h-8 items-center'>
+      <div className='flex items-center gap-2'>
+        <Checkbox
+          id='logs-fuzzy-search'
+          checked={filters.fuzzySearch !== false}
+          onCheckedChange={(checked) => handleChange('fuzzySearch', checked)}
+        />
+        <Label
+          htmlFor='logs-fuzzy-search'
+          className='text-muted-foreground text-sm leading-5 font-normal'
+        >
+          {t('Fuzzy Search')}
+        </Label>
+      </div>
+    </LogsFilterField>
+  )
   const advancedFilters = (
     <>
       <LogsFilterField>
@@ -420,6 +451,7 @@ export function CommonLogsFilterBar<TData>(
           {modelFilter}
           {groupFilter}
           {typeFilter}
+          {fuzzySearchFilter}
         </>
       }
       advancedFilters={advancedFilters}
@@ -429,6 +461,7 @@ export function CommonLogsFilterBar<TData>(
           {modelFilter}
           {groupFilter}
           {typeFilter}
+          {fuzzySearchFilter}
           {advancedFilters}
         </>
       }

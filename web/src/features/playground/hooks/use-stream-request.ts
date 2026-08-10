@@ -27,9 +27,9 @@ import {
   isStreamClosedReadyState,
   isStreamDoneMessage,
   parseStreamErrorDetails,
-  parseStreamMessageUpdates,
+  parseStreamChunk,
 } from '../lib'
-import type { ChatCompletionRequest } from '../types'
+import type { ChatCompletionRequest, TokenUsage } from '../types'
 
 interface StreamEventSource {
   readyState?: number
@@ -43,7 +43,7 @@ interface StreamEventSource {
 
 interface StreamRequestCallbacks {
   onUpdate: (type: 'reasoning' | 'content', chunk: string) => void
-  onComplete: () => void
+  onComplete: (usage?: TokenUsage) => void
   onError: (error: string, errorCode?: string) => void
 }
 
@@ -99,6 +99,7 @@ export function createStreamRequestController(
     source = nextSource
     runtime.setStreaming(true)
     let completed = false
+    let lastUsage: TokenUsage | undefined
 
     const isCurrent = () =>
       generation === requestGeneration && source === nextSource
@@ -116,12 +117,16 @@ export function createStreamRequestController(
       if (isStreamDoneMessage(data)) {
         completed = true
         closeActiveSource(nextSource)
-        callbacks.onComplete()
+        callbacks.onComplete(lastUsage)
         return
       }
 
       try {
-        const updates = parseStreamMessageUpdates(data)
+        const { updates, usage } = parseStreamChunk(data)
+
+        if (usage) {
+          lastUsage = usage
+        }
 
         for (const update of updates) {
           callbacks.onUpdate(update.type, update.chunk)
@@ -205,7 +210,7 @@ export function useStreamRequest() {
     (
       payload: ChatCompletionRequest,
       onUpdate: (type: 'reasoning' | 'content', chunk: string) => void,
-      onComplete: () => void,
+      onComplete: (usage?: TokenUsage) => void,
       onError: (error: string, errorCode?: string) => void
     ) =>
       controllerRef.current?.send(payload, {

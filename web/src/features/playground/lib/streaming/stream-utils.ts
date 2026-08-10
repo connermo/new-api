@@ -17,7 +17,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import { ERROR_MESSAGES } from '../../constants'
-import type { ChatCompletionChunk } from '../../types'
+import type { ChatCompletionChunk, TokenUsage } from '../../types'
 
 const STREAM_DONE_MESSAGE = '[DONE]'
 const STREAM_CLOSED_READY_STATE = 2
@@ -27,6 +27,12 @@ export type StreamUpdateType = 'reasoning' | 'content'
 export type StreamMessageUpdate = {
   type: StreamUpdateType
   chunk: string
+}
+
+export type StreamChunkResult = {
+  updates: StreamMessageUpdate[]
+  /** Present only on the trailing chunk that carries stream_options usage. */
+  usage?: TokenUsage
 }
 
 type StreamErrorPayload = {
@@ -64,12 +70,18 @@ export function parseStreamErrorDetails(data?: string): StreamErrorDetails {
   }
 }
 
-export function parseStreamMessageUpdates(data: string): StreamMessageUpdate[] {
+/**
+ * Parse one SSE chunk into content/reasoning updates plus any usage payload.
+ * Providers send usage on a trailing chunk whose choices array is empty, so
+ * usage is read independently of the delta.
+ */
+export function parseStreamChunk(data: string): StreamChunkResult {
   const chunk = JSON.parse(data) as ChatCompletionChunk
+  const usage = chunk.usage
   const delta = chunk.choices?.[0]?.delta
 
   if (!delta) {
-    return []
+    return { updates: [], usage }
   }
 
   const updates: StreamMessageUpdate[] = []
@@ -82,7 +94,11 @@ export function parseStreamMessageUpdates(data: string): StreamMessageUpdate[] {
     updates.push({ type: 'content', chunk: delta.content })
   }
 
-  return updates
+  return { updates, usage }
+}
+
+export function parseStreamMessageUpdates(data: string): StreamMessageUpdate[] {
+  return parseStreamChunk(data).updates
 }
 
 export function isStreamDoneMessage(data: string): boolean {

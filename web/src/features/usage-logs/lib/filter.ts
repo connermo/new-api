@@ -58,6 +58,8 @@ export function buildSearchParams(
         ...(commonFilters.upstreamRequestId && {
           upstreamRequestId: commonFilters.upstreamRequestId,
         }),
+        // Only carried in the URL when turned off, since it defaults to on.
+        ...(commonFilters.fuzzySearch === false && { fuzzySearch: false }),
       }
     }
     case 'drawing': {

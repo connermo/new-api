@@ -56,29 +56,67 @@ function formatDuration(
   return t('{{value}}s', { value: (durationMs / 1000).toFixed(2) })
 }
 
+/**
+ * Output throughput in tokens/s, measured over the whole response.
+ * Returns undefined when either side of the ratio is unusable.
+ */
+function computeTokensPerSecond(
+  completionTokens: number | undefined,
+  durationMs: number | undefined
+): string | undefined {
+  if (!completionTokens || !durationMs || durationMs <= 0) {
+    return undefined
+  }
+
+  const tokensPerSecond = completionTokens / (durationMs / 1000)
+
+  if (!Number.isFinite(tokensPerSecond) || tokensPerSecond <= 0) {
+    return undefined
+  }
+
+  return tokensPerSecond.toFixed(tokensPerSecond >= 10 ? 0 : 1)
+}
+
 export function MessageMetadata(props: MessageMetadataProps) {
   const { t } = useTranslation()
   const messageTime = formatMessageTime(props.message.createdAt)
   const duration = formatDuration(props.message.durationMs, t)
+  const usage = props.message.usage
+  const firstToken = formatDuration(props.message.firstTokenMs, t)
+  const tokensPerSecond = computeTokensPerSecond(
+    usage?.completion_tokens,
+    props.message.durationMs
+  )
 
-  if (!messageTime && !duration) {
+  const segments = [
+    duration && t('Response time: {{duration}}', { duration }),
+    firstToken && t('TTFT: {{duration}}', { duration: firstToken }),
+    usage &&
+      t('Tokens: {{prompt}} in / {{completion}} out', {
+        prompt: usage.prompt_tokens ?? 0,
+        completion: usage.completion_tokens ?? 0,
+      }),
+    tokensPerSecond && t('{{value}} tok/s', { value: tokensPerSecond }),
+  ].filter((segment): segment is string => Boolean(segment))
+
+  if (!messageTime && segments.length === 0) {
     return null
   }
 
   return (
     <div
       className={cn(
-        'text-muted-foreground mt-1 flex min-h-4 items-center gap-1.5 text-[11px] leading-none',
+        'text-muted-foreground mt-1 flex min-h-4 flex-wrap items-center gap-1.5 text-[11px] leading-none',
         props.alignment === 'right' && 'justify-end'
       )}
     >
       {messageTime && <time>{messageTime}</time>}
-      {duration && (
-        <>
-          {messageTime && <span aria-hidden='true'>·</span>}
-          <span>{t('Response time: {{duration}}', { duration })}</span>
-        </>
-      )}
+      {segments.map((segment, index) => (
+        <span key={segment} className='flex items-center gap-1.5'>
+          {(messageTime || index > 0) && <span aria-hidden='true'>·</span>}
+          <span>{segment}</span>
+        </span>
+      ))}
     </div>
   )
 }

@@ -28,6 +28,12 @@ export interface MessageVersion {
   content: string
 }
 
+export interface TokenUsage {
+  prompt_tokens: number
+  completion_tokens: number
+  total_tokens: number
+}
+
 export interface Message {
   key: string
   from: MessageRole
@@ -49,6 +55,10 @@ export interface Message {
   isContentComplete?: boolean
   status?: MessageStatus
   errorCode?: string | null
+  /** Token counts reported by the upstream provider, when available. */
+  usage?: TokenUsage
+  /** Time to first token (ms), streaming responses only. */
+  firstTokenMs?: number
 }
 
 // API payload types
@@ -92,6 +102,7 @@ export interface ChatCompletionChunk {
     }
     finish_reason: string | null
   }>
+  usage?: TokenUsage
 }
 
 export interface ChatCompletionResponse {
@@ -108,11 +119,7 @@ export interface ChatCompletionResponse {
     }
     finish_reason: string
   }>
-  usage?: {
-    prompt_tokens: number
-    completion_tokens: number
-    total_tokens: number
-  }
+  usage?: TokenUsage
 }
 
 // Configuration types

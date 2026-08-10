@@ -19,6 +19,7 @@ For commercial licensing, please contact support@quantumnous.com
 import assert from 'node:assert/strict'
 import { describe, test } from 'node:test'
 
+import { parseStreamChunk } from '../lib'
 import type { ChatCompletionRequest } from '../types'
 import { createStreamRequestController } from './use-stream-request'
 
@@ -196,5 +197,55 @@ describe('latest-wins stream request coordination', () => {
     )
 
     assert.deepEqual(updates, ['current'])
+  })
+})
+
+describe('stream chunk usage parsing', () => {
+  test('reads usage from the trailing chunk that carries no choices', () => {
+    // Upstreams report token counts on a final chunk with an empty choices
+    // array, so usage must be read independently of the delta.
+    const result = parseStreamChunk(
+      JSON.stringify({
+        choices: [],
+        usage: { prompt_tokens: 11, completion_tokens: 7, total_tokens: 18 },
+      })
+    )
+
+    assert.deepEqual(result.updates, [])
+    assert.deepEqual(result.usage, {
+      prompt_tokens: 11,
+      completion_tokens: 7,
+      total_tokens: 18,
+    })
+  })
+
+  test('returns content and reasoning updates when no usage is present', () => {
+    const result = parseStreamChunk(
+      JSON.stringify({
+        choices: [{ delta: { reasoning_content: 'think', content: 'hi' } }],
+      })
+    )
+
+    assert.deepEqual(result.updates, [
+      { type: 'reasoning', chunk: 'think' },
+      { type: 'content', chunk: 'hi' },
+    ])
+    assert.equal(result.usage, undefined)
+  })
+
+  test('keeps usage attached to a chunk that also carries a delta', () => {
+    const result = parseStreamChunk(
+      JSON.stringify({
+        choices: [{ delta: { content: 'done' } }],
+        usage: { prompt_tokens: 3, completion_tokens: 4, total_tokens: 7 },
+      })
+    )
+
+    assert.deepEqual(result.updates, [{ type: 'content', chunk: 'done' }])
+    assert.deepEqual(result.usage, {
+      prompt_tokens: 3,
+      completion_tokens: 4,
+      total_tokens: 7,
+    })
   })
 })

@@ -34,7 +34,12 @@ import {
   isAssistantMessageFinal,
   isAssistantMessagePending,
 } from '../lib'
-import type { Message, PlaygroundConfig, ParameterEnabled } from '../types'
+import type {
+  Message,
+  PlaygroundConfig,
+  ParameterEnabled,
+  TokenUsage,
+} from '../types'
 import { useStreamRequest } from './use-stream-request'
 
 interface UseChatHandlerOptions {
@@ -82,6 +87,11 @@ export function useChatHandler({
     reasoning: '',
   })
   const streamFlushTimerRef = useRef<number | null>(null)
+  const streamTimingRef = useRef<{
+    generation: number
+    startedAt: number
+    firstTokenMs?: number
+  }>({ generation: 0, startedAt: 0 })
 
   const discardPendingStreamUpdates = useCallback((generation: number) => {
     if (streamFlushTimerRef.current !== null) {
@@ -191,6 +201,13 @@ export function useChatHandler({
     (generation: number, type: 'reasoning' | 'content', chunk: string) => {
       if (generation !== requestGenerationRef.current) return
       if (pendingStreamChunksRef.current.generation !== generation) return
+      const timing = streamTimingRef.current
+      if (
+        timing.generation === generation &&
+        timing.firstTokenMs === undefined
+      ) {
+        timing.firstTokenMs = Date.now() - timing.startedAt
+      }
       pendingStreamChunksRef.current[type] = mergePendingStreamChunk(
         pendingStreamChunksRef.current[type],
         chunk
@@ -202,16 +219,19 @@ export function useChatHandler({
 
   // Handle stream complete
   const handleStreamComplete = useCallback(
-    (generation: number) => {
+    (generation: number, usage?: TokenUsage) => {
       if (generation !== requestGenerationRef.current) return
       flushStreamUpdates(generation)
       setIsRequesting(false)
+      const timing = streamTimingRef.current
+      const firstTokenMs =
+        timing.generation === generation ? timing.firstTokenMs : undefined
       onMessageUpdate((prev) => {
         if (generation !== requestGenerationRef.current) return prev
         return updateLastAssistantMessage(prev, (message) =>
           isAssistantMessageFinal(message)
             ? message
-            : completeAssistantMessage(message)
+            : completeAssistantMessage(message, { usage, firstTokenMs })
         )
       })
     },
@@ -249,6 +269,7 @@ export function useChatHandler({
       abortControllerRef.current = null
       discardPendingStreamUpdates(generation)
       setIsRequesting(true)
+      streamTimingRef.current = { generation, startedAt: Date.now() }
       const payload = buildChatCompletionPayload(
         messages,
         config,
@@ -257,7 +278,7 @@ export function useChatHandler({
       void sendStreamRequest(
         payload,
         (type, chunk) => handleStreamUpdate(generation, type, chunk),
-        () => handleStreamComplete(generation),
+        (usage) => handleStreamComplete(generation, usage),
         (error, errorCode) => handleStreamError(generation, error, errorCode)
       )
     },
