@@ -27,10 +27,10 @@ var channelMetricsOnce sync.Once
 
 // metricsResult holds parsed Prometheus metrics from a vLLM/SGLang endpoint.
 type metricsResult struct {
-	GPUCacheUsage    float64 // vllm:gpu_cache_usage_perc (0~1)
-	RequestsWaiting  float64 // vllm:num_requests_waiting
-	RequestsRunning  float64 // vllm:num_requests_running
-	Reachable        bool
+	GPUCacheUsage   float64 // vllm:gpu_cache_usage_perc (0~1)
+	RequestsWaiting float64 // vllm:num_requests_waiting
+	RequestsRunning float64 // vllm:num_requests_running
+	Reachable       bool
 }
 
 // channelMetricsEntry groups channels sharing the same metrics URL.
