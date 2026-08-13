@@ -365,6 +365,18 @@ export type OperationsSettings = {
   'perf_metrics_setting.flush_interval': number
   'perf_metrics_setting.bucket_time': 'hour' | 'minute' | '5min'
   'perf_metrics_setting.retention_days': number
+  'response_cache_setting.enabled': boolean
+  'response_cache_setting.share_scope': string
+  'response_cache_setting.enabled_models': string[]
+  'response_cache_setting.ttl_seconds': number
+  'response_cache_setting.max_entries': number
+  'response_cache_setting.max_request_bytes': number
+  'response_cache_setting.max_response_bytes': number
+  'response_cache_setting.max_temperature': number
+  'response_cache_setting.cache_tool_requests': boolean
+  'response_cache_setting.hit_billing': string
+  'response_cache_setting.hit_billing_ratio': number
+  'response_cache_setting.stream_replay_chunk_size': number
 }
 
 export type SecuritySettings = {

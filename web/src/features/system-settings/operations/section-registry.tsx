@@ -22,6 +22,7 @@ import { MonitoringSettingsSection } from '../integrations/monitoring-settings-s
 import { WorkerSettingsSection } from '../integrations/worker-settings-section'
 import { LogSettingsSection } from '../maintenance/log-settings-section'
 import { PerformanceSection } from '../maintenance/performance-section'
+import { ResponseCacheSection } from '../maintenance/response-cache-section'
 import { UpdateCheckerSection } from '../maintenance/update-checker-section'
 import type { OperationsSettings } from '../types'
 import { createSectionRegistry } from '../utils/section-registry'
@@ -123,6 +124,40 @@ const OPERATIONS_SECTIONS = [
             settings['performance_setting.monitor_memory_threshold'] ?? 90,
           'performance_setting.monitor_disk_threshold':
             settings['performance_setting.monitor_disk_threshold'] ?? 95,
+        }}
+      />
+    ),
+  },
+  {
+    id: 'response-cache',
+    titleKey: 'Gateway Response Cache',
+    build: (settings: OperationsSettings) => (
+      <ResponseCacheSection
+        defaultValues={{
+          'response_cache_setting.enabled':
+            settings['response_cache_setting.enabled'] ?? false,
+          'response_cache_setting.share_scope':
+            settings['response_cache_setting.share_scope'] ?? 'user',
+          'response_cache_setting.enabled_models':
+            settings['response_cache_setting.enabled_models'] ?? [],
+          'response_cache_setting.ttl_seconds':
+            settings['response_cache_setting.ttl_seconds'] ?? 3600,
+          'response_cache_setting.max_entries':
+            settings['response_cache_setting.max_entries'] ?? 10000,
+          'response_cache_setting.max_request_bytes':
+            settings['response_cache_setting.max_request_bytes'] ?? 262144,
+          'response_cache_setting.max_response_bytes':
+            settings['response_cache_setting.max_response_bytes'] ?? 262144,
+          'response_cache_setting.max_temperature':
+            settings['response_cache_setting.max_temperature'] ?? 0.2,
+          'response_cache_setting.cache_tool_requests':
+            settings['response_cache_setting.cache_tool_requests'] ?? false,
+          'response_cache_setting.hit_billing':
+            settings['response_cache_setting.hit_billing'] ?? 'free',
+          'response_cache_setting.hit_billing_ratio':
+            settings['response_cache_setting.hit_billing_ratio'] ?? 0.2,
+          'response_cache_setting.stream_replay_chunk_size':
+            settings['response_cache_setting.stream_replay_chunk_size'] ?? 24,
         }}
       />
     ),

@@ -56,6 +56,19 @@ const defaultOperationsSettings: OperationsSettings = {
   'perf_metrics_setting.flush_interval': 5,
   'perf_metrics_setting.bucket_time': 'hour',
   'perf_metrics_setting.retention_days': 0,
+  // Mirrors the backend defaults in setting/operation_setting/response_cache_setting.go.
+  'response_cache_setting.enabled': false,
+  'response_cache_setting.share_scope': 'user',
+  'response_cache_setting.enabled_models': [],
+  'response_cache_setting.ttl_seconds': 3600,
+  'response_cache_setting.max_entries': 10000,
+  'response_cache_setting.max_request_bytes': 262144,
+  'response_cache_setting.max_response_bytes': 262144,
+  'response_cache_setting.max_temperature': 0.2,
+  'response_cache_setting.cache_tool_requests': false,
+  'response_cache_setting.hit_billing': 'free',
+  'response_cache_setting.hit_billing_ratio': 0.2,
+  'response_cache_setting.stream_replay_chunk_size': 24,
 }
 
 export function OperationsSettings() {
