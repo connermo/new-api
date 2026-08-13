@@ -73,4 +73,9 @@ const (
 	// fallback in authHelper (finishAdminAudit) skips its record to avoid
 	// duplicate entries.
 	ContextKeyAuditLogged ContextKey = "audit_logged"
+
+	// ContextKeyResponseCacheInfo stores the gateway response-cache marker for a
+	// request served from cache. It is picked up when building the consume log so
+	// both the free and the discounted billing path record the same evidence.
+	ContextKeyResponseCacheInfo ContextKey = "response_cache_info"
 )

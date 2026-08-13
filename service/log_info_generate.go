@@ -83,7 +83,8 @@ func GenerateTextOtherInfo(ctx *gin.Context, relayInfo *relaycommon.RelayInfo, m
 	if relayInfo.ReasoningEffort != "" {
 		other["reasoning_effort"] = relayInfo.ReasoningEffort
 	}
-	if relayInfo.IsModelMapped {
+	// ChannelMeta 是嵌入指针，未选择渠道的请求（如网关缓存命中）为 nil。
+	if relayInfo.HasChannelMeta() && relayInfo.IsModelMapped {
 		other["is_model_mapped"] = true
 		other["upstream_model_name"] = relayInfo.UpstreamModelName
 	}
@@ -115,7 +116,18 @@ func GenerateTextOtherInfo(ctx *gin.Context, relayInfo *relaycommon.RelayInfo, m
 	appendBillingInfo(relayInfo, other)
 	appendParamOverrideInfo(relayInfo, other)
 	appendStreamStatus(relayInfo, other)
+	appendResponseCacheInfo(ctx, other)
 	return other
+}
+
+// appendResponseCacheInfo 记录本次响应是否由网关缓存直接应答。
+// 命中率与缓存年龄是判断该功能是否值得开启的唯一依据，因此必须落到消费日志里。
+func appendResponseCacheInfo(ctx *gin.Context, other map[string]interface{}) {
+	info := common.GetContextKeyStringMap(ctx, constant.ContextKeyResponseCacheInfo)
+	if len(info) == 0 {
+		return
+	}
+	other["response_cache"] = info
 }
 
 func appendParamOverrideInfo(relayInfo *relaycommon.RelayInfo, other map[string]interface{}) {

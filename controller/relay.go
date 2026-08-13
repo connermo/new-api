@@ -181,6 +181,22 @@ func Relay(c *gin.Context, relayFormat types.RelayFormat) {
 		}
 	}()
 
+	// 网关响应缓存：命中则直接应答，完全跳过渠道选择与上游请求。
+	// 放在预扣费之后是刻意的——命中路径复用同一套结算、退款与日志链路，
+	// 不需要在计费系统里再开一条平行分支。
+	if cacheCtx := service.PrepareResponseCache(c, relayInfo); cacheCtx != nil {
+		if cached := cacheCtx.Lookup(c); cached != nil {
+			if cacheErr := service.ServeResponseCacheHit(c, relayInfo, cached); cacheErr != nil {
+				logger.LogError(c, "response cache replay incomplete: "+cacheErr.Error())
+			}
+			return
+		}
+		cacheCtx.BeginCapture(c)
+		defer func() {
+			cacheCtx.FinishCapture(relayInfo, newAPIError != nil)
+		}()
+	}
+
 	retryParam := &service.RetryParam{
 		Ctx:         c,
 		TokenGroup:  relayInfo.TokenGroup,
